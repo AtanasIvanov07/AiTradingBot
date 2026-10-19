@@ -9,6 +9,8 @@ tests matters: the more variants you try, the more likely the best one is luck (
 
 | 1 | 2026-10-19 | — (data pipeline) | — | Binance BTC/ETH-USDT, Kraken + Bitvavo BTC/ETH-EUR; 1d/4h/1h | — | 18 series, all pass validation (0 errors); report in `research/reports/data-validation.md` | Phase 1 data foundation. Data-quality stats only; no returns or strategy results computed. |
 
+| 2 | 2026-10-19 | H1 | SMA band filter, 18-variant grid; selected n=50, band=4% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | Portfolio 47.3% CAGR, −58.3% DD, Sharpe 0.99 vs 50/50 B&H 8.5%, −87.3%, 0.51 | **KILL**: DD > 40% in all 18 variants; plateau fails. Cumulative variants tested: 18. |
+
 ## Notes
 
 ### #0 — Phase 0 smoke test
@@ -34,3 +36,25 @@ tests matters: the more variants you try, the more likely the best one is luck (
   - Bitvavo had **large dislocations during extreme moves**: BTC 1h +9.3% vs Kraken (7 Jan 2021), ETH 1h €200.00 vs €228 (16 Feb 2020), several 5–8% on 4 Dec 2021.
   - Implication for Phase 2/3: on Bitvavo, stops and market orders during violent moves can fill far from "fair" prices. Stress-test slippage beyond 0.05% for exits triggered in high-volatility candles.
 - Size on disk: ~44 MB in total. Kraken's 9.6 GB archive was read remotely; only the needed CSVs were fetched.
+
+### #2 — H1 pre-screen (Gate 1)
+- Command: `python -m aitradingbot.analysis.prescreen H1 --out research/reports/prescreen-H1.md`, run on committed code `accfddf` (7.6 s).
+- Decision: **KILL** under the registered rules. Details are in the H1 card and the report.
+- Why:
+  - **Every** variant's portfolio drawdown was 53.7–73.8%, above the 40% limit.
+  - The selected variant's neighbour (n=75, band=4%) has a third of its Calmar, so there's no stable plateau.
+- What it still tells us: a plain trend filter roughly doubled Sharpe vs buy & hold and cut the worst drawdown from
+  about −87% to about −58%. That fits the "drawdown reduction, not alpha" rationale, but it isn't enough to meet the
+  risk bar when the strategy is fully invested while long.
+- Bug checks before accepting the result:
+  - Buy & hold matches market history (BTC/EUR €11,994 → €15,421, CAGR 5.2% before costs; 2018 drawdowns −80% BTC,
+    −94% ETH).
+  - An independent vectorised recomputation of BTC n=100, band=0% matched the engine (CAGR 20.28% vs 20.20%, max
+    DD −61.98% vs −61.97%).
+  - Every trade happens at the open after the signal changed. The one exception is the opening purchase on
+    2018-01-01, when the trend was already up.
+  - Kraken's daily open equals the previous close to within 0.005% (median), so next-open fills are realistic.
+- Multiple-testing count so far: 18 variants (H1).
+- Caution for what comes next: any new idea shaped by this result (e.g. "H1 plus volatility sizing" or "shorter
+  lookbacks") was suggested by the development data. If registered, it must say so and count toward the
+  3-hypothesis cap. Its pre-screen evidence is weaker than for a hypothesis written blind.
