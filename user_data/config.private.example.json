@@ -1,0 +1,29 @@
+{
+    "_comment": "Copy to config.private.json (gitignored) and fill in. Load it AFTER config.json: freqtrade trade -c user_data/config.json -c user_data/config.private.json. Never commit real values; never paste them into chats or screenshots.",
+    "exchange": {
+        "key": "TRADE-ONLY key, no withdrawal permission, IP-whitelisted",
+        "secret": "",
+        "ccxt_config": {
+            "options": {
+                "operatorId": 0
+            }
+        }
+    },
+    "telegram": {
+        "enabled": true,
+        "token": "from BotFather",
+        "chat_id": "your numeric chat id only"
+    },
+    "api_server": {
+        "enabled": true,
+        "listen_ip_address": "127.0.0.1",
+        "listen_port": 8080,
+        "verbosity": "error",
+        "enable_openapi": false,
+        "jwt_secret_key": "random string, at least 32 characters",
+        "ws_token": "random string",
+        "CORS_origins": [],
+        "username": "choose a username",
+        "password": "long random string"
+    }
+}

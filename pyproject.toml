@@ -1,0 +1,31 @@
+[project]
+name = "aitradingbot"
+version = "0.1.0"
+description = "Rule-based spot crypto trading research and bot (Freqtrade). See PROJECT_PLAN.md."
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Freqtrade's own template files are kept unmodified (sample strategy = Phase 0 smoke test).
+extend-exclude = [
+    "user_data/strategies/sample_strategy.py",
+    "user_data/hyperopts/sample_hyperopt_loss.py",
+    "user_data/notebooks",
+]
+# Also honour the excludes when pre-commit passes file names explicitly.
+force-exclude = true
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "PTH"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

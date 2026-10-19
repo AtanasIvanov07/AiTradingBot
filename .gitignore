@@ -1,0 +1,36 @@
+# --- Secrets: never commit ---------------------------------------------------
+.env
+*.env
+user_data/config.private.json
+user_data/*.private.json
+
+# --- Python ------------------------------------------------------------------
+.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# --- Market data and generated outputs (large, regenerable) ------------------
+data/
+user_data/data/
+user_data/backtest_results/
+user_data/hyperopt_results/
+user_data/plot/
+user_data/logs/
+user_data/models/
+
+# --- Bot databases (trade history lives here; back up, don't commit) --------
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# --- OS / editors ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/

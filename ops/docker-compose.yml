@@ -1,0 +1,29 @@
+# Server deployment (Linux VM; see PROJECT_PLAN.md §3.7).
+# Run from the repo root:  docker compose -f ops/docker-compose.yml up -d
+# Requires user_data/config.private.json (copy config.private.example.json and fill it in).
+#
+# Keep the image tag identical to the freqtrade version in requirements.txt
+# (tests/test_repo.py checks this). Never use :latest or :stable for live trading.
+services:
+  freqtrade:
+    image: freqtradeorg/freqtrade:2026.9
+    container_name: freqtrade
+    restart: unless-stopped
+    volumes:
+      - "../user_data:/freqtrade/user_data"
+    # FreqUI / REST API: bound to localhost only; reach it through an SSH tunnel.
+    ports:
+      - "127.0.0.1:8080:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # dry_run is controlled by config.json (true until Phase 4). config.private.json holds secrets.
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/freqtrade.log
+      --db-url sqlite:////freqtrade/user_data/tradesv3.dryrun.sqlite
+      --config /freqtrade/user_data/config.json
+      --config /freqtrade/user_data/config.private.json
+      --strategy SampleStrategy
