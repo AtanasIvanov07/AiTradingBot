@@ -25,6 +25,7 @@ import pandas as pd
 from aitradingbot.ingest.common import (
     OHLCV_COLUMNS,
     Dataset,
+    clean,
     normalize_ohlcv,
     sha256_file,
     write_clean,
@@ -144,9 +145,11 @@ def ingest(
             if not frames:
                 raise FileNotFoundError(f"no Kraken data for {pair} {timeframe}")
             merged, conflicts = merge_archives(frames)
+            merged, cleaning = clean(merged, timeframe)
             notes = {
                 "overlap_conflicts": conflicts,
                 "gaps_mean": "Kraken writes no candle for intervals without trades",
+                **cleaning,
             }
             path = write_clean(Dataset("kraken", pair, timeframe), merged, inputs, root, notes)
             log.info("kraken %s %s: %d rows -> %s", pair, timeframe, len(merged), path)

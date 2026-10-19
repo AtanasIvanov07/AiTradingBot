@@ -70,9 +70,23 @@ def test_small_gaps_warn_large_gaps_error(candles: MakeCandles) -> None:
     assert "gaps" in {f.check for f in validate(holey, "1d").errors}
 
 
+def test_open_jump_is_an_error(candles: MakeCandles) -> None:
+    frame = candles(periods=5)
+    frame.loc[3, ["open", "high"]] = [175.0, 175.0]  # bad print, OHLC still consistent
+    report = validate(frame, "1d")
+    assert "open_jump" in {f.check for f in report.errors}
+
+
+def test_no_candles_in_assessed_window_is_an_error(candles: MakeCandles) -> None:
+    frame = candles(start="2015-01-01", periods=100)
+    report = validate(frame, "1d", assess_from=pd.Timestamp("2017-08-01", tz="UTC"))
+    assert "window" in {f.check for f in report.errors}
+
+
 def test_gaps_before_assess_from_only_warn(candles: MakeCandles) -> None:
-    frame = candles(start="2015-01-01", periods=1500).drop(index=range(10, 100))  # 2015 holes
-    frame = frame.reset_index(drop=True)
+    frame = candles(start="2015-01-01", periods=1500)
+    frame[["open", "close", "high", "low"]] = [100.0, 100.0, 101.0, 99.0]  # flat: no jumps at gaps
+    frame = frame.drop(index=range(10, 100)).reset_index(drop=True)  # 2015 holes
     assert not validate(frame, "1d").ok  # 90 of 1500 missing overall: error
     report = validate(frame, "1d", assess_from=pd.Timestamp("2016-01-01", tz="UTC"))
     assert report.ok
@@ -94,7 +108,8 @@ def test_four_hour_grid_alignment(candles: MakeCandles) -> None:
 
 def test_outliers_flag_big_moves_and_wicks(candles: MakeCandles) -> None:
     frame = candles(periods=6)
-    frame.loc[3, ["open", "close", "high", "low"]] = [102.0, 140.0, 141.0, 101.0]  # +35% close
+    frame.loc[3, ["open", "close", "high", "low"]] = [102.0, 140.0, 141.0, 101.0]  # +37% close
+    frame.loc[4, ["open", "close", "high", "low"]] = [140.0, 104.0, 141.0, 103.0]  # -26% close
     frame.loc[5, "low"] = 10.0  # 90% lower wick
     flagged = outlier_moves(frame, "1d")
     assert sorted(flagged["open_time"].dt.day.tolist()) == [4, 5, 6]  # day 5 is the move back down

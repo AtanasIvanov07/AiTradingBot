@@ -20,7 +20,8 @@ def fake_api(candle_times: list[int], page_size: int) -> Callable[[str], bytes]:
         start, end = int(query["start"][0]), int(query["end"][0])
         limit = min(int(query["limit"][0]), page_size)
         hits = sorted((t for t in candle_times if start <= t <= end), reverse=True)[:limit]
-        return json.dumps([[t, "1", "2", "0.5", "1.5", "10"] for t in hits]).encode()
+        # open == previous close, as in a continuous 24/7 market
+        return json.dumps([[t, "1.5", "2", "1", "1.5", "10"] for t in hits]).encode()
 
     return get
 

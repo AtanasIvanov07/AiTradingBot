@@ -23,8 +23,8 @@ from aitradingbot.ingest.common import (
     OHLCV_COLUMNS,
     Dataset,
     HttpGet,
+    clean,
     data_dir,
-    drop_misaligned,
     http_get,
     normalize_ohlcv,
     sha256_bytes,
@@ -140,16 +140,15 @@ def ingest(
             if not available:
                 raise FileNotFoundError(f"no Binance data for {symbol} {timeframe}")
             frame = normalize_ohlcv(pd.concat([read_zip(p) for _, p in available]))
-            frame, dropped = drop_misaligned(frame, timeframe)
+            frame, cleaning = clean(frame, timeframe)
             inputs: list[dict[str, Any]] = [
                 {"archive": p.name, "sha256": sha256_file(p)} for _, p in available
             ]
             notes: dict[str, Any] = {
                 "months_requested": f"{start}..{end}",
                 "months_not_published": missing,
+                **cleaning,
             }
-            if dropped:
-                notes["dropped_misaligned"] = dropped
             dataset = Dataset("binance", symbol_to_pair(symbol), timeframe)
             path = write_clean(dataset, frame, inputs, root, notes)
             log.info("binance %s %s: %d rows -> %s", symbol, timeframe, len(frame), path)

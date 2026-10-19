@@ -6,6 +6,8 @@ from conftest import MakeCandles
 
 from aitradingbot.ingest.common import (
     Dataset,
+    clean,
+    drop_bad_opens,
     drop_misaligned,
     drop_unclosed,
     list_clean_datasets,
@@ -36,6 +38,36 @@ def test_drop_misaligned_removes_off_grid_candles(candles: MakeCandles) -> None:
     assert len(kept) == 5
     assert note["count"] == 1 and note["first"].startswith("2024-01-01T03:28")
     assert drop_misaligned(kept, "1h")[1] == {}
+
+
+def test_drop_bad_opens_removes_reopening_prints(candles: MakeCandles) -> None:
+    """Modelled on Kraken BTC/EUR 2018-01-13: after an outage the first trade printed at 20000."""
+    frame = candles(periods=6)  # closes 100..105, opens 0.5 below
+    frame.loc[3, ["open", "high"]] = [175.0, 175.0]  # +75% vs previous close 102
+    kept, note = drop_bad_opens(frame, "1d")
+    assert len(kept) == 5 and pd.Timestamp("2024-01-04", tz="UTC") not in set(kept["open_time"])
+    assert note["count"] == 1 and note["limit"] == 0.25
+    assert drop_bad_opens(kept, "1d")[1] == {}  # the next open is compared to a surviving close
+
+
+def test_bad_open_rule_keeps_real_moves_and_never_cascades(candles: MakeCandles) -> None:
+    """Thin early markets: price moves +30% across each no-trade gap, but every candle opens
+    near its own close. Nothing is a bad print, so nothing may be dropped. (The first version
+    of this rule repeated until stable and deleted 99.9% of Kraken's BTC/EUR 1h history.)"""
+    frame = candles(periods=10)
+    for i in range(10):
+        price = 100.0 * 1.3**i
+        frame.loc[i, ["open", "high", "low", "close"]] = [price, price * 1.01, price * 0.99, price]
+    kept, note = drop_bad_opens(frame, "1d")
+    assert len(kept) == 10 and note == {}
+
+
+def test_clean_reports_only_what_it_dropped(candles: MakeCandles) -> None:
+    frame, notes = clean(candles(periods=5), "1d")
+    assert len(frame) == 5 and notes == {}
+    messy = candles(periods=5)
+    messy.loc[2, "open"] = 10.0  # -90% jump
+    assert set(clean(messy, "1d")[1]) == {"dropped_bad_open"}
 
 
 def test_drop_unclosed_removes_the_running_candle(candles: MakeCandles) -> None:

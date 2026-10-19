@@ -112,6 +112,48 @@ def drop_unclosed(
     return frame.loc[closed].reset_index(drop=True)
 
 
+# Largest believable move from one candle's close to the next candle's open. In 24/7 markets the
+# next open is the first trade after the previous close (median gap ~0.005% on our data), so a
+# bigger jump is a bad print, e.g. Kraken's reopening trades after its Jan 2018 outage
+# (BTC/EUR opened at €20,000 vs a real price of ~€11,400). Same limits as the outlier flags.
+OPEN_JUMP_LIMITS = {"1h": 0.10, "4h": 0.15, "1d": 0.25}
+
+
+def bad_opens(frame: pd.DataFrame, timeframe: str) -> pd.Series:
+    """True where an open is a bad print: far from the previous close *and* from its own close.
+
+    Both conditions matter. A genuine move during a no-trade gap opens far from the previous close
+    but near its own close, and is kept. A bad print sits far from both (Kraken BTC/EUR
+    2018-01-13: open €20,000, previous close €11,420, own close €11,765).
+    """
+    limit = OPEN_JUMP_LIMITS[timeframe]
+    from_previous = (frame["open"] / frame["close"].shift(1) - 1).abs() > limit
+    from_own_close = (frame["open"] / frame["close"] - 1).abs() > limit
+    mask: pd.Series = from_previous & from_own_close
+    return mask
+
+
+def drop_bad_opens(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Drop candles whose open is a bad print (see ``bad_opens``), in a single pass.
+
+    Dropping the whole candle (not "repairing" the open) keeps the clean store free of synthetic
+    values; it becomes a visible gap. Deliberately *not* repeated until stable: re-checking against
+    an ever-older surviving close cascades through gappy history and deletes valid data.
+    """
+    limit = OPEN_JUMP_LIMITS[timeframe]
+    bad = bad_opens(frame, timeframe)
+    dropped: list[pd.Timestamp] = frame.loc[bad, "open_time"].tolist()
+    frame = frame.loc[~bad].reset_index(drop=True)
+    note: dict[str, Any] = {}
+    if dropped:
+        note = {
+            "count": len(dropped),
+            "limit": limit,
+            "times": [t.isoformat() for t in sorted(dropped)[:50]],
+        }
+    return frame, note
+
+
 def drop_misaligned(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Drop candles whose open isn't on the UTC timeframe grid, and describe what was dropped.
 
@@ -129,6 +171,18 @@ def drop_misaligned(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame, 
             "last": dropped.max().isoformat(),
         }
     return frame.loc[aligned].reset_index(drop=True), note
+
+
+def clean(frame: pd.DataFrame, timeframe: str) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Cleaning rules every source goes through; returns manifest notes for whatever was dropped."""
+    notes: dict[str, Any] = {}
+    frame, misaligned = drop_misaligned(frame, timeframe)
+    if misaligned:
+        notes["dropped_misaligned"] = misaligned
+    frame, bad_opens = drop_bad_opens(frame, timeframe)
+    if bad_opens:
+        notes["dropped_bad_open"] = bad_opens
+    return frame, notes
 
 
 def pair_stem(pair: str) -> str:

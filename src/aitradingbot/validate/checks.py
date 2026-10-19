@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from aitradingbot.ingest.common import OHLCV_COLUMNS, TIMEFRAMES
+from aitradingbot.ingest.common import OHLCV_COLUMNS, OPEN_JUMP_LIMITS, TIMEFRAMES, bad_opens
 
 ERROR = "error"
 WARNING = "warning"
@@ -170,6 +170,9 @@ def validate(
         error("ohlc", f"{count} rows break OHLC invariants (low ≤ open/close ≤ high, prices > 0)")
     if (count := misaligned(frame, timeframe)) > 0:
         error("alignment", f"{count} candles not aligned to the UTC {timeframe} grid")
+    if (count := int(bad_opens(frame, timeframe).sum())) > 0:
+        limit = OPEN_JUMP_LIMITS[timeframe]
+        error("open_jump", f"{count} bad opens (> {limit:.0%} from previous and own close)")
 
     first, last = frame["open_time"].min(), frame["open_time"].max()
     window = frame
@@ -184,6 +187,8 @@ def validate(
             )
         window = frame.loc[frame["open_time"] >= assess_from]
         scope = f" since {assess_from:%Y-%m-%d}"
+        if window.empty:  # all data predates the period we use: nothing usable left
+            error("window", f"no candles{scope}")
 
     gaps: list[Gap] = []
     missing, fraction = 0, 0.0

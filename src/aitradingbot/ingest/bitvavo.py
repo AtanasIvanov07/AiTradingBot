@@ -21,6 +21,7 @@ from aitradingbot.ingest.common import (
     OHLCV_COLUMNS,
     Dataset,
     HttpGet,
+    clean,
     data_dir,
     drop_unclosed,
     http_get,
@@ -99,8 +100,9 @@ def ingest(
             write_atomic(raw, gzip.compress(json.dumps(rows).encode("utf-8")))
             frame = drop_unclosed(parse_candles(rows), timeframe)
             frame = frame[frame["open_time"] <= end_ts].reset_index(drop=True)
+            frame, cleaning = clean(frame, timeframe)
             inputs = [{"raw_file": raw.name, "sha256": sha256_file(raw), "api": API}]
-            notes = {"requested_start": start, "requested_end": end_ts.isoformat()}
+            notes = {"requested_start": start, "requested_end": end_ts.isoformat(), **cleaning}
             dataset = Dataset("bitvavo", market_to_pair(market), timeframe)
             path = write_clean(dataset, frame, inputs, root, notes)
             log.info("bitvavo %s %s: %d rows -> %s", market, timeframe, len(frame), path)
