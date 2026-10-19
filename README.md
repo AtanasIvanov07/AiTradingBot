@@ -42,6 +42,17 @@ Everything lands in `data/clean/<source>/<BASE>_<QUOTE>_<tf>.parquet` with a `.m
 counts). Candles are labelled by **open time in UTC**. Splits are in `src/aitradingbot/splits.py`; the holdout
 (2025-01 → 2026-09) is downloaded and quality-checked, but strategy results on it are looked at once, at the end of Phase 2.
 
+## Pre-screen (Phase 1, Gate 1)
+
+```powershell
+python -m aitradingbot.analysis.prescreen H1 --out research/reports/prescreen-H1.md
+```
+
+Applies the **registered** rules in `research/hypotheses/` mechanically: the grid, plateau-median variant selection,
+the §7 pass rule at 2× costs, and each card's kill rules. It uses development data (2018–2022) only, and the exit code is 0
+only on PASS. Log every run in `research/journal.md`. The engine (`src/aitradingbot/analysis/engine.py`) fills each
+decision at the next candle's open; `tests/test_engine.py` checks it against a hand-calculated example.
+
 ## Layout
 
 | Path | What |

@@ -613,7 +613,7 @@ Every phase ends with a **gate**. Write down the result honestly in `research/re
 - [x] Ingest scripts for the Binance public data, Kraken EUR history and Bitvavo (`python -m aitradingbot.ingest`, done 19 Oct 2026).
 - [x] Data validation tests (§4.4) all green, with a data manifest per series (`research/reports/data-validation.md`, journal #1).
 - [x] Hypothesis cards for H1, H2 and H3, registered **before** testing (19 Oct 2026; shared rules in `research/hypotheses/_CONVENTIONS.md`). H4 not registered.
-- [ ] Your own ~100-line vectorised backtester, unit-tested on a hand-calculated toy example (e.g. 10 candles where you know the right answer).
+- [x] Your own small backtester, unit-tested on a hand-calculated toy example (19 Oct 2026). It's a ~130-line candle loop rather than vectorised, for transparent band and cash handling. Next-open fills are tested against a hand-worked 4-candle example and look-ahead guards. Plus `aitradingbot.analysis.prescreen`, which applies the registered Gate 1 rules as code.
 - [ ] Pre-screen each hypothesis on development data at 2× costs vs buy-and-hold.
 - [ ] Robustness heatmaps and a cross-asset check for the survivors.
 - [ ] Every run logged in `research/journal.md`.
