@@ -28,7 +28,7 @@ repos:
     hooks:
       - id: mypy
         args: [--config-file=pyproject.toml]
-        additional_dependencies: [pytest]
+        additional_dependencies: [pytest, pandas-stubs==3.0.5.260914]
         files: ^(src|tests)/
 
   # Secret scanner: blocks commits that contain API keys, tokens, etc.

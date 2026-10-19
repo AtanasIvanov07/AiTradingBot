@@ -400,7 +400,7 @@ Terms are from the official pack page as of October 2026. Offers change (Digital
 | Source | What | Use |
 |---|---|---|
 | **Binance public data** (data.binance.vision) | BTCUSDT/ETHUSDT klines since 2017, 1m–1d, zipped CSVs with checksums. No account needed. | Long-horizon research |
-| **Kraken downloadable OHLCVT history** (quarterly zip files; Freqtrade documents the import) | Long **EUR** history (BTC/EUR back to the 2010s) | EUR-denominated validation |
+| **Kraken downloadable OHLCVT history** (assets.kraken.com: a ~9.6 GB full archive in 5 parts, plus quarterly zips) | Long **EUR** history (BTC/EUR from 2013; the archive manifest says coverage runs to 2026-09-30) | EUR-denominated validation. `aitradingbot.ingest kraken` reads only the needed CSVs via HTTP range requests (~tens of MB). |
 | **Bitvavo API** via `freqtrade download-data` | The exact market you'll trade | Final validation and live parity. **Verify how far back history goes.** |
 | CryptoDataDownload (CSV) | Independent copy | Cross-check only |
 
@@ -408,17 +408,20 @@ Terms are from the official pack page as of October 2026. Offers change (Digital
 
 ### 4.3 Cleaning checklist
 
-- [ ] Convert all timestamps to **UTC**, and record whether each source labels candles by **open** or **close** time (Binance uses open time).
-- [ ] Remove **duplicate** candles and check timestamps increase steadily.
-- [ ] Detect **gaps** (missing candles). Report them. Don't silently forward-fill prices used for signals. For small gaps, forward-fill and flag them. Exclude periods with large gaps.
-- [ ] Check **OHLC consistency**: low ≤ open, close ≤ high, and volume ≥ 0.
-- [ ] Flag **outliers**: candles with |return| > 25% in a day, or wicks far beyond neighbouring candles. Cross-check against a second source before keeping or removing them.
-- [ ] Mark **zero-volume** and exchange-maintenance periods.
-- [ ] **Cross-source check:** daily closes from two sources should agree within ~0.5% (allowing for the EUR/USD effect). Investigate larger differences.
-- [ ] Watch for **survivorship bias** if you ever expand beyond BTC/ETH: include coins that were later delisted.
-- [ ] Write a **data manifest** per file: source, download date, checksum, row count, date range.
+Implemented in `src/aitradingbot/ingest/` (cleaning) and `src/aitradingbot/validate/` (checks); see journal #1 for what it found.
 
-### 4.4 Automated data tests (`tests/test_data.py`)
+- [x] Convert all timestamps to **UTC**; every source is stored with `open_time` = candle **open** time.
+- [x] Remove exact **duplicate** candles. Conflicting duplicates are kept so validation reports them, and timestamps must strictly increase.
+- [x] Drop candles **off the timeframe grid** (e.g. Binance's post-outage :28 candles in Feb 2018) and record them in the manifest.
+- [x] Detect **gaps** (missing candles) and report them. The clean store never contains synthetic candles. Any forward-filling is decided at analysis time and must be flagged. More than 1% missing since the warm-up start is an error.
+- [x] Check **OHLC consistency**: low ≤ open, close ≤ high, and volume ≥ 0.
+- [x] Flag **outliers**: daily close-to-close moves or wicks > 25% (4h: 15%, 1h: 10%). Cross-check against a second source before keeping or removing them.
+- [x] Mark **zero-volume** candles.
+- [x] **Cross-source check:** Bitvavo vs Kraken EUR closes (median difference ~0.04%; largest disagreements listed in the report).
+- [ ] Watch for **survivorship bias** if you ever expand beyond BTC/ETH: include coins that were later delisted.
+- [x] Write a **data manifest** per file: source, download date, input checksums, row count, date range, cleaning notes.
+
+### 4.4 Automated data tests (`tests/test_data_quality.py`)
 
 Automated checks that run on every refresh:
 
@@ -607,8 +610,8 @@ Every phase ends with a **gate**. Write down the result honestly in `research/re
 
 **Goal:** a trustworthy dataset and at least one hypothesis that survives the pre-screen.
 
-- [ ] Ingest scripts for the Binance public data, Kraken EUR history and Bitvavo (via Freqtrade).
-- [ ] Data validation tests (§4.4) all green, with a data manifest written.
+- [x] Ingest scripts for the Binance public data, Kraken EUR history and Bitvavo (`python -m aitradingbot.ingest`, done 19 Oct 2026).
+- [x] Data validation tests (§4.4) all green, with a data manifest per series (`research/reports/data-validation.md`, journal #1).
 - [ ] Hypothesis cards for H1, H2 and H3 (and H4 optional), registered **before** testing.
 - [ ] Your own ~100-line vectorised backtester, unit-tested on a hand-calculated toy example (e.g. 10 candles where you know the right answer).
 - [ ] Pre-screen each hypothesis on development data at 2× costs vs buy-and-hold.
@@ -939,7 +942,7 @@ With hosting at €0, **trading fees are by far the biggest cost**, followed by 
 | Binance EEA restrictions | From multiple news reports (June–July 2026) | Binance's notices in your account |
 | Bulgarian tax details (appendix/code, deductions, loss carry-forward, cost basis, staking, business-income risk) | Partly conflicting sources | NRA (nra.bg) or a Bulgarian accountant |
 | DAC8 transposition into Bulgarian law and NRA reporting deadlines | Unverified | NRA |
-| Bitvavo historical candle depth via the API | Unknown | Try `download-data` in Phase 1 |
+| Bitvavo historical candle depth via the API | **Answered:** BTC/EUR and ETH/EUR from 8 Mar 2019 (ETH/EUR 1h from 16 Nov 2019). It doesn't cover the 2018 bear market. | — |
 | Freqtrade + Bitvavo reliability | Community-tested only; no stop-loss on exchange | Dry-run in Phase 3 |
 | LEAN (C#) support for Bitvavo/OKX EEA | Not confirmed | LEAN docs, if you consider option B |
 | Future strategy performance | **Unknowable.** Historical results can and often do fail to repeat. | Phases 3–4 |

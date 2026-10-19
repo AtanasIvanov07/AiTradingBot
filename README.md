@@ -12,6 +12,7 @@ A rule-based spot crypto trading experiment (BTC/EUR, ETH/EUR) built on [Freqtra
 py -3.12 -m venv .venv            # or: & "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt -r requirements-dev.txt
+pip install -e . --no-deps        # makes `python -m aitradingbot...` work
 pre-commit install
 
 # checks
@@ -22,6 +23,24 @@ pytest
 freqtrade download-data --config user_data/config.json --timeframes 5m --timerange 20261001-
 freqtrade backtesting --config user_data/config.json --strategy SampleStrategy --timerange 20261002- --fee 0.0025
 ```
+
+## Research data (Phase 1)
+
+```powershell
+python -m aitradingbot.ingest all        # Binance (USDT), Kraken (EUR), Bitvavo (EUR): 1d, 4h, 1h
+python -m aitradingbot.validate --out research/reports/data-validation.md
+pytest                                   # includes tests/test_data_quality.py on the real data
+```
+
+| Source | What | How |
+|---|---|---|
+| Binance public data | BTC/USDT, ETH/USDT since Aug 2017 | Monthly zips from data.binance.vision, SHA-256 verified, cached in `data/raw/` |
+| Kraken OHLCVT | BTC/EUR, ETH/EUR long EUR history | Reads only the needed CSVs out of Kraken's ~10 GB archive via HTTP range requests (CRC-checked). `--zip` accepts local copies. |
+| Bitvavo API | BTC/EUR, ETH/EUR, the market the bot trades | Public candles endpoint, paged backwards; unclosed candles dropped |
+
+Everything lands in `data/clean/<source>/<BASE>_<QUOTE>_<tf>.parquet` with a `.manifest.json` (inputs, checksums, row
+counts). Candles are labelled by **open time in UTC**. Splits are in `src/aitradingbot/splits.py`; the holdout
+(2025-01 → 2026-09) is downloaded and quality-checked, but strategy results on it are looked at once, at the end of Phase 2.
 
 ## Layout
 

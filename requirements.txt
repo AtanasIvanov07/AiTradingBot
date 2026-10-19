@@ -1,3 +1,7 @@
 # Runtime. Keep the Freqtrade version identical to the Docker image tag in ops/docker-compose.yml
 # (tests/test_repo.py checks this).
 freqtrade==2026.9
+
+# Research code (src/aitradingbot). Pinned to the versions Freqtrade 2026.9 resolved to.
+pandas==3.0.6
+pyarrow==26.0.0

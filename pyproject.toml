@@ -1,8 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "aitradingbot"
 version = "0.1.0"
 description = "Rule-based spot crypto trading research and bot (Freqtrade). See PROJECT_PLAN.md."
 requires-python = ">=3.12"
+dependencies = ["pandas", "pyarrow"]  # exact pins live in requirements.txt
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 line-length = 100
