@@ -413,6 +413,7 @@ Implemented in `src/aitradingbot/ingest/` (cleaning) and `src/aitradingbot/valid
 - [x] Convert all timestamps to **UTC**; every source is stored with `open_time` = candle **open** time.
 - [x] Remove exact **duplicate** candles. Conflicting duplicates are kept so validation reports them, and timestamps must strictly increase.
 - [x] Drop candles **off the timeframe grid** (e.g. Binance's post-outage :28 candles in Feb 2018) and record them in the manifest.
+- [x] Drop candles whose **open jumps** more than 25% / 15% / 10% (1d / 4h / 1h) from the previous close. In 24/7 markets the open is the first trade after that close, so a bigger jump is a bad print. Example: Kraken reopened after its Jan 2018 outage with BTC/EUR at €20,000 and ETH/EUR at €700. Added 19 Oct 2026, after the H3 cross-check exposed it (journal #4). The validator treats any remaining jump as an error.
 - [x] Detect **gaps** (missing candles) and report them. The clean store never contains synthetic candles. Any forward-filling is decided at analysis time and must be flagged. More than 1% missing since the warm-up start is an error.
 - [x] Check **OHLC consistency**: low ≤ open, close ≤ high, and volume ≥ 0.
 - [x] Flag **outliers**: daily close-to-close moves or wicks > 25% (4h: 15%, 1h: 10%). Cross-check against a second source before keeping or removing them.
@@ -614,7 +615,7 @@ Every phase ends with a **gate**. Write down the result honestly in `research/re
 - [x] Data validation tests (§4.4) all green, with a data manifest per series (`research/reports/data-validation.md`, journal #1).
 - [x] Hypothesis cards for H1, H2 and H3, registered **before** testing (19 Oct 2026; shared rules in `research/hypotheses/_CONVENTIONS.md`). H4 not registered.
 - [x] Your own small backtester, unit-tested on a hand-calculated toy example (19 Oct 2026). It's a ~130-line candle loop rather than vectorised, for transparent band and cash handling. Next-open fills are tested against a hand-worked 4-candle example and look-ahead guards. Plus `aitradingbot.analysis.prescreen`, which applies the registered Gate 1 rules as code.
-- [ ] Pre-screen each hypothesis on development data at 2× costs vs buy-and-hold.
+- [x] Pre-screen each hypothesis on development data at 2× costs vs buy-and-hold (19 Oct 2026): **H1, H2 and H3 all killed at Gate 1** (journal #5–#7, `research/reports/prescreen-H*.md`).
 - [ ] Robustness heatmaps and a cross-asset check for the survivors.
 - [ ] Every run logged in `research/journal.md`.
 

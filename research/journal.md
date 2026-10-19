@@ -7,8 +7,12 @@ tests matters: the more variants you try, the more likely the best one is luck (
 |---|---|---|---|---|---|---|---|
 | 0 | 2026-10-19 | — (pipeline smoke test) | Freqtrade `SampleStrategy` (unmodified template), 5m | Bitvavo BTC/EUR, ETH/EUR, Oct 2026 only | fee 0.25% | 9 trades, −9.15% (market −7.14%), max DD 10.0%, profit factor 0.17 | Proves the toolchain works. Not a strategy test. The data window is deliberately outside every research split (dev/validation/holdout end 2026-09-30). |
 | 1 | 2026-10-19 | — (data pipeline) | — | Binance BTC/ETH-USDT, Kraken + Bitvavo BTC/ETH-EUR; 1d/4h/1h | — | 18 series, all pass validation (0 errors); report in `research/reports/data-validation.md` | Phase 1 data foundation. Data-quality stats only; no returns or strategy results computed. |
-| 2 | 2026-10-19 | H1 | SMA band filter, 18-variant grid; selected n=50, band=4% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | Portfolio 47.3% CAGR, −58.3% DD, Sharpe 0.99 vs 50/50 B&H 8.5%, −87.3%, 0.51 | **KILL**: DD > 40% in all 18 variants; plateau fails. Cumulative variants tested: 18. |
-| 3 | 2026-10-19 | H2 | Weekly dual momentum, 15-variant grid; selected lookback=30, buffer=0% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, Wednesday informational) | 0.60%/side | 37.0% CAGR, −80.2% DD, Sharpe 0.80 vs 50/50 B&H 8.5%, −87.3%, 0.51 | **KILL**: DD −77% to −88% in all 15 variants; plateau fails; loses to H1 (Calmar 0.46 vs 0.81). Cumulative variants tested: 34 (incl. 1 informational re-run). |
+| 2 | 2026-10-19 | H1 | SMA band filter, 18-variant grid; selected n=50, band=4% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | Portfolio 47.3% CAGR, −58.3% DD, Sharpe 0.99 vs 50/50 B&H 8.5%, −87.3%, 0.51 | **KILL**: DD > 40% in all 18 variants; plateau fails. Cumulative variants tested: 18. *Superseded by #5 (data correction #4); decision unchanged.* |
+| 3 | 2026-10-19 | H2 | Weekly dual momentum, 15-variant grid; selected lookback=30, buffer=0% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, Wednesday informational) | 0.60%/side | 37.0% CAGR, −80.2% DD, Sharpe 0.80 vs 50/50 B&H 8.5%, −87.3%, 0.51 | **KILL**: DD −77% to −88% in all 15 variants; plateau fails; loses to H1 (Calmar 0.46 vs 0.81). Cumulative variants tested: 34 (incl. 1 informational re-run). *Superseded by #6 (data correction #4); decision unchanged.* |
+| 4 | 2026-10-19 | — (data correction) | Bad-open cleaning rule | All sources | — | Kraken BTC/EUR + ETH/EUR 2018-01-13 reopening prints (open €20,000 / €700) dropped in 1d/4h/1h, plus a few old hourly prints | Found while cross-checking H3. Bug-fix re-runs of the same grids (#5–#7), not new variants (conventions §9). The first H3 run on bad data is void. |
+| 5 | 2026-10-19 | H1 (re-run) | Same 18-variant grid; selected n=50, band=4% | Corrected Kraken data, dev 2018–2022 | 0.60%/side | 47.3% CAGR, −57.2% DD, Sharpe 0.99, Calmar 0.83 vs B&H 8.5%, −87.0%, 0.51 | **KILL** (unchanged): DD > 40% in all variants; plateau fails. |
+| 6 | 2026-10-19 | H2 (re-run) | Same 15-variant grid; selected lookback=30, buffer=0% | Corrected Kraken data, dev 2018–2022 | 0.60%/side | 37.0% CAGR, −79.8% DD, Sharpe 0.80 | **KILL** (unchanged): DD, plateau, loses to H1 (0.46 vs 0.83). |
+| 7 | 2026-10-19 | H3 | Vol targeting, 12-variant grid; selected target_vol=30%, lookback=60 | Corrected Kraken data, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 12.5% CAGR, −47.7% DD, Sharpe 0.54, Calmar 0.26 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: BTC Sharpe 0.33 < 0.44; −3.3% CAGR without the best year. Cumulative variants tested: 46. |
 
 ## Notes
 
@@ -80,3 +84,47 @@ tests matters: the more variants you try, the more likely the best one is luck (
 - Pattern across H1 and H2: strategies that are fully invested whenever they're long don't get under the 40%
   drawdown limit in 2018–2022, whatever the timing signal. H3, which scales exposure down by volatility, is the
   registered test of whether reducing *size* helps where timing didn't. That card was written before either result.
+
+### #4 — Data correction: bad reopening prints (found during the H3 check)
+- How it was found:
+  - The H3 cross-check didn't match: the engine gave BTC CAGR 7.24%, an independent close-to-close version 5.48%.
+  - Diffing the two equity curves pointed at **2018-01-13**: Kraken's first candle after its outage.
+  - Its **open was €20,000** (high €20,000). Binance had BTC at about $13,750 (~€11,400) that day.
+  - ETH/EUR opened at **€700** (high €1,497) against ~€1,000.
+  - The engine fills at opens, so strategies that rebalanced there traded at fantasy prices. The validator *had*
+    flagged the candle as an outlier warning, but it was never cross-checked as the plan requires.
+- Fix:
+  - `drop_bad_opens`: a candle is dropped when its open is more than 25% / 15% / 10% (1d / 4h / 1h) from the
+    previous close **and** from its own close. A real move during a no-trade gap opens near its own close and is kept.
+  - The validator now treats any such candle as an error. It also errors when a series has no candles in the
+    assessed window.
+- A mistake on the way, caught before any re-run used it:
+  - The first version repeated until stable. Comparing against ever-older closes cascaded through Kraken's gappy
+    2013–2015 history and deleted 99.9% of BTC/EUR 1h.
+  - The validator didn't notice, because the few remaining rows predated the assessed window. That's now an error.
+  - The rule runs in a single pass, and a test covers the cascade case.
+- Dropped since 2017-08:
+  - Kraken BTC/EUR: 1d 2018-01-13; 4h 2018-01-13 08:00; 1h 2017-08-26 20:00, 2018-01-13 11:00, 2018-04-03 19:00.
+  - Kraken ETH/EUR: 1d/4h/1h at the same 2018-01-13 reopening.
+  - Binance ETH/USDT: 1h/4h 2017-08-22 04:00.
+  - Validation: 0 errors. 30/30 data tests pass.
+- Per conventions §9, H1–H3 were re-run on the full grids (#5–#7). These are bug-fix re-runs, not new variants.
+
+### #5–#7 — Gate 1 on corrected data
+- Code: fix committed as `087d1d5`. All three reports were generated from that clean revision; an earlier run on the
+  uncommitted fix gave identical numbers.
+- **H1:** same selected variant, near-identical numbers (DD −58.3% → −57.2%). **KILL** stands.
+- **H2:** near-identical numbers (DD −80.2% → −79.8%). **KILL** stands.
+- **H3** (first valid run):
+  - Selected target_vol=30%, lookback=60. Portfolio 12.5% CAGR, −47.7% DD, Sharpe 0.54, vs 50/50 buy & hold
+    8.5%, −87.0%, 0.51.
+  - Passes its drawdown rule (−47.7% vs a −65.2% limit), the plateau, and criteria 1, 3 and 4 for the portfolio.
+  - Fails **criterion 4 for BTC** (Sharpe 0.33 vs buy & hold 0.44).
+  - Fails **criterion 7** (−3.3% CAGR without its best year).
+  - Read plainly: volatility targeting *halves the worst loss*, but holding about 40% exposure gives up so much
+    upside that BTC's risk-adjusted return falls *below* buy & hold, and almost all the return comes from 2020.
+  - The engine now matches the independent calculation (BTC CAGR 5.39% vs 5.48%, DD −49.13% for both).
+- **Phase 1 outcome: all three registered hypotheses failed Gate 1.** Cumulative variants tested: 46 (18 + 15 + 1
+  informational + 12).
+- Next decision (PROJECT_PLAN.md §7, Phase 1 kill/iterate): either register up to 2 new hypotheses and repeat once,
+  or stop and DCA. Any new hypothesis is now informed by these results and must say so.
