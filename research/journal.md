@@ -6,10 +6,9 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | # | Date | Hypothesis | Strategy / params | Data & period | Costs | Result (key metrics) | Decision / notes |
 |---|---|---|---|---|---|---|---|
 | 0 | 2026-10-19 | — (pipeline smoke test) | Freqtrade `SampleStrategy` (unmodified template), 5m | Bitvavo BTC/EUR, ETH/EUR, Oct 2026 only | fee 0.25% | 9 trades, −9.15% (market −7.14%), max DD 10.0%, profit factor 0.17 | Proves the toolchain works. Not a strategy test. The data window is deliberately outside every research split (dev/validation/holdout end 2026-09-30). |
-
 | 1 | 2026-10-19 | — (data pipeline) | — | Binance BTC/ETH-USDT, Kraken + Bitvavo BTC/ETH-EUR; 1d/4h/1h | — | 18 series, all pass validation (0 errors); report in `research/reports/data-validation.md` | Phase 1 data foundation. Data-quality stats only; no returns or strategy results computed. |
-
 | 2 | 2026-10-19 | H1 | SMA band filter, 18-variant grid; selected n=50, band=4% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | Portfolio 47.3% CAGR, −58.3% DD, Sharpe 0.99 vs 50/50 B&H 8.5%, −87.3%, 0.51 | **KILL**: DD > 40% in all 18 variants; plateau fails. Cumulative variants tested: 18. |
+| 3 | 2026-10-19 | H2 | Weekly dual momentum, 15-variant grid; selected lookback=30, buffer=0% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, Wednesday informational) | 0.60%/side | 37.0% CAGR, −80.2% DD, Sharpe 0.80 vs 50/50 B&H 8.5%, −87.3%, 0.51 | **KILL**: DD −77% to −88% in all 15 variants; plateau fails; loses to H1 (Calmar 0.46 vs 0.81). Cumulative variants tested: 34 (incl. 1 informational re-run). |
 
 ## Notes
 
@@ -58,3 +57,26 @@ tests matters: the more variants you try, the more likely the best one is luck (
 - Caution for what comes next: any new idea shaped by this result (e.g. "H1 plus volatility sizing" or "shorter
   lookbacks") was suggested by the development data. If registered, it must say so and count toward the
   3-hypothesis cap. Its pre-screen evidence is weaker than for a hypothesis written blind.
+
+### #3 — H2 pre-screen (Gate 1)
+- Command: `python -m aitradingbot.analysis.prescreen H2 --out research/reports/prescreen-H2.md`, run on committed code `cde4a78` (10.6 s, including the internal H1 re-run for criterion 5′).
+- Decision: **KILL**. Details are in the H2 card and the report.
+- Why:
+  - Drawdowns of −77% to −88% across the whole grid. The selected variant's −80% is barely better than buy & hold's −87%.
+  - No plateau.
+  - It loses to H1 on Calmar, so choosing between BTC and ETH added nothing over a simple in-or-out filter.
+- Where the drawdown came from:
+  - The peak came on 2018-01-14, after riding ETH +77% in two weeks.
+  - Through 2018 the 30-day momentum check kept re-entering bear-market rallies and got hit each time. Weekly lag
+    plus holding a single asset magnified every loss.
+  - Equity bottomed at 0.35 on 2019-03-05.
+- Fragility:
+  - Moving the rebalance from Sunday to Wednesday changed CAGR from 37.0% to 23.9%.
+  - Bitvavo, which starts in 2019-04 and so skips the 2018 bear market, looks far better (84% CAGR, −53% DD). That's
+    regime dependence, not confirmation.
+- Bug check: an independent re-implementation (my own weekly decisions, close-to-close returns, one cost side for
+  cash moves and two for BTC↔ETH switches) matched the engine (CAGR 36.98% vs 37.01%, max DD −80.22% vs −80.15%).
+- Multiple-testing count so far: 34 runs (H1 18; H2 15 plus 1 informational Wednesday run).
+- Pattern across H1 and H2: strategies that are fully invested whenever they're long don't get under the 40%
+  drawdown limit in 2018–2022, whatever the timing signal. H3, which scales exposure down by volatility, is the
+  registered test of whether reducing *size* helps where timing didn't. That card was written before either result.
