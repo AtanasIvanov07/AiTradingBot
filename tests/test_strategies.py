@@ -4,7 +4,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aitradingbot.analysis.strategies import h1_trend_filter, h2_dual_momentum, h3_vol_target
+from aitradingbot.analysis.strategies import (
+    h1_trend_filter,
+    h2_dual_momentum,
+    h3_vol_target,
+    h4_trend_vol,
+)
 
 DAY = pd.Timedelta(days=1)
 
@@ -33,13 +38,17 @@ def h3_rule(close: pd.Series) -> pd.Series:
     return h3_vol_target(close, 0.5, 10, 365)
 
 
+def h4_rule(close: pd.Series) -> pd.Series:
+    return h4_trend_vol(close, 10, 0.02, 0.5, 10, 365)
+
+
 @pytest.mark.parametrize("cut", [5, 20, 40])
 def test_signals_never_look_ahead(cut: int) -> None:
     rng = np.random.default_rng(1)
     close = series(list(100 * np.exp(np.cumsum(rng.normal(0, 0.03, 60)))))
     shocked = close.copy()
     shocked.iloc[cut + 1 :] = shocked.iloc[cut + 1 :] * 5  # change only the future
-    for rule in (h1_rule, h3_rule):
+    for rule in (h1_rule, h3_rule, h4_rule):
         pd.testing.assert_series_equal(rule(close).iloc[: cut + 1], rule(shocked).iloc[: cut + 1])
     pair = pd.DataFrame({"BTC": close, "ETH": close.iloc[::-1].to_numpy()}, index=close.index)
     shocked_pair = pair.copy()
@@ -91,3 +100,23 @@ def test_h3_exposure_by_hand() -> None:
     assert exposure.iloc[:2].to_list() == [0.0, 0.0]  # warm-up: not enough returns yet
     assert exposure.iloc[2:].to_list() == pytest.approx([0.5] * 8)
     assert h3_vol_target(close, vol * 3, 2, 365).iloc[-1] == 1.0  # capped, never leveraged
+
+
+def test_h4_by_hand() -> None:
+    """Zig-zag uptrend (+3%, -1%, ...) then a calm decline (-3% a day).
+
+    While trending up, the 2-day realised vol is |log 1.03 - log 0.99| / √2 × √365 = 53.5%,
+    so with a 20% target the size is 0.374. In the calm decline, H3's size alone climbs back
+    to 100% (low volatility), but H4 is flat because the trend is off.
+    """
+    factors = [1, 1.03, 0.99, 1.03, 0.99, 1.03, 0.99, 0.97, 0.97, 0.97, 0.97]
+    close = series(list(100 * np.cumprod(factors)))
+    trend = h1_trend_filter(close, 3, 0.0)
+    size = h3_vol_target(close, 0.2, 2, 365)
+    h4 = h4_trend_vol(close, 3, 0.0, 0.2, 2, 365)
+    assert trend.to_list() == [0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+    expected_size = 0.2 / (abs(math.log(1.03) - math.log(0.99)) / math.sqrt(2) * math.sqrt(365))
+    assert h4.iloc[2:7].to_list() == pytest.approx([expected_size] * 5)
+    assert expected_size == pytest.approx(0.374, abs=1e-3)
+    assert size.iloc[-1] == 1.0 and h4.iloc[-1] == 0.0  # calm decline: H3 full size, H4 flat
+    assert h4.to_list() == pytest.approx((trend * size).to_list())

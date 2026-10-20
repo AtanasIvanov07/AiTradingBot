@@ -56,6 +56,21 @@ def h2_dual_momentum(
     return weights
 
 
+def h4_trend_vol(
+    close: pd.Series,
+    n: int,
+    band: float,
+    target_vol: float,
+    lookback: int,
+    periods_per_year: float,
+) -> pd.Series:
+    """H4: H1's trend state (1 or 0) times H3's volatility-scaled size, so flat in downtrends."""
+    trend = h1_trend_filter(close, n, band)
+    size = h3_vol_target(close, target_vol, lookback, periods_per_year)
+    exposure: pd.Series = trend * size
+    return exposure
+
+
 def h3_vol_target(
     close: pd.Series, target_vol: float, lookback: int, periods_per_year: float
 ) -> pd.Series:

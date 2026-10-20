@@ -11,8 +11,10 @@ from aitradingbot.ingest.common import Dataset, write_clean
 
 
 def test_grids_match_the_registered_cards() -> None:
-    assert [len(ps.grid_variants(h)) for h in ("H1", "H2", "H3")] == [18, 15, 12]
+    assert [len(ps.grid_variants(h)) for h in ("H1", "H2", "H3", "H4")] == [18, 15, 12, 16]
     assert ps.grid_variants("H1")[0] == (("n", 50), ("band", 0.0))
+    assert ps.GRIDS["H4"] == {"n": [50, 100, 150, 200], "target_vol": [0.30, 0.40, 0.50, 0.60]}
+    assert (ps.H4_BAND, ps.H4_VOL_LOOKBACK, ps.REBALANCE_BANDS["H4"]) == (0.02, 30, 0.10)
 
 
 def test_neighbours_are_one_step_in_one_parameter() -> None:
@@ -70,7 +72,20 @@ def write_synthetic_market(root: Path, source: str = "kraken", quote: str = "EUR
         write_clean(Dataset(source, f"{asset}/{quote}", "1d"), frame, [], root)
 
 
-@pytest.mark.parametrize("hypothesis", ["H1", "H2", "H3"])
+def test_h4_targets_are_trend_times_size(tmp_path: Path) -> None:
+    write_synthetic_market(tmp_path)
+    market = ps.load_market("kraken", "1d", tmp_path)
+    params = (("n", 100), ("target_vol", 0.40))
+    h4 = ps.sleeve_targets("H4", params, market, "BTC")
+    trend = ps.sleeve_targets("H1", (("n", 100), ("band", 0.02)), market, "BTC")
+    size = ps.sleeve_targets("H3", (("target_vol", 0.40), ("lookback", 30)), market, "BTC")
+    pd.testing.assert_series_equal(h4, trend * size, check_names=False)
+    assert (h4[trend == 0] == 0).all() and h4.max() <= 1.0
+    assert ps.warmup("H4", params, market) == 100
+    assert ps.warmup("H4", (("n", 50), ("target_vol", 0.3)), market) == 50
+
+
+@pytest.mark.parametrize("hypothesis", ["H1", "H2", "H3", "H4"])
 def test_end_to_end_on_synthetic_data(tmp_path: Path, hypothesis: str) -> None:
     write_synthetic_market(tmp_path)
     screen = ps.prescreen(hypothesis, tmp_path)
@@ -83,9 +98,17 @@ def test_end_to_end_on_synthetic_data(tmp_path: Path, hypothesis: str) -> None:
     report = ps.render(screen)
     assert f"Pre-screen {hypothesis}" in report and "## Decision:" in report
     assert "Binance USDT (confirmation 1): data not available, skipped" in report
-    if hypothesis == "H1":  # no Binance data -> the registered H1 kill check cannot pass
+    if hypothesis in {"H1", "H4"}:  # no Binance data -> the registered kill check cannot pass
         binance = next(c for c in screen.checks if "Binance" in c.criterion)
+        assert binance.criterion.startswith(f"{hypothesis} kill")
         assert not binance.passed and not screen.passed
+    if hypothesis in {"H3", "H4"}:
+        assert any(
+            c.criterion == f"{hypothesis} kill: turnover ≤ 400% per year" for c in screen.checks
+        )
+    if hypothesis == "H4":  # exits to cash, so the standard drawdown bar applies, not H3's
+        assert any(n.startswith("2 Max drawdown ≤ 40%") for n in names)
+        assert not any("25% smaller" in n for n in names)
 
 
 def test_confirmation_window_starts_after_warmup(tmp_path: Path) -> None:

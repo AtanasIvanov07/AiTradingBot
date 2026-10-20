@@ -28,6 +28,7 @@ from aitradingbot.analysis.strategies import (
     h1_trend_filter,
     h2_dual_momentum,
     h3_vol_target,
+    h4_trend_vol,
 )
 from aitradingbot.ingest.common import TIMEFRAMES, Dataset
 from aitradingbot.splits import DEVELOPMENT
@@ -44,14 +45,18 @@ TITLES = {
     "H1": "Daily trend following (SMA filter with band)",
     "H2": "Weekly dual-momentum rotation BTC / ETH / EUR",
     "H3": "Volatility-targeted holding",
+    "H4": "Trend filter with volatility-targeted sizing (post-hoc)",
 }
 GRIDS: dict[str, dict[str, list[float]]] = {
     "H1": {"n": [50, 75, 100, 125, 150, 200], "band": [0.0, 0.02, 0.04]},
     "H2": {"lookback": [30, 60, 90, 120, 180], "buffer": [0.0, 0.05, 0.10]},
     "H3": {"target_vol": [0.30, 0.40, 0.50, 0.60], "lookback": [20, 30, 60]},
+    "H4": {"n": [50, 100, 150, 200], "target_vol": [0.30, 0.40, 0.50, 0.60]},
 }
-SLEEVE_HYPOTHESES = {"H1", "H3"}  # 50% of capital per asset, run independently
-H3_REBALANCE_BAND = 0.10
+SLEEVE_HYPOTHESES = {"H1", "H3", "H4"}  # 50% of capital per asset, run independently
+REBALANCE_BANDS = {"H1": 0.0, "H3": 0.10, "H4": 0.10}
+H4_BAND = 0.02  # fixed at registration: middle of H1's band grid
+H4_VOL_LOOKBACK = 30  # fixed at registration: middle of H3's lookback grid (days)
 WEDNESDAY = 2
 
 Params = tuple[tuple[str, float], ...]
@@ -168,9 +173,13 @@ class Evaluation:
 
 
 def warmup(hypothesis: str, params: Params, market: Market) -> int:
-    key = "n" if hypothesis == "H1" else "lookback"
+    """Candles of history the selected variant needs before its first decision."""
+    if hypothesis == "H4":
+        days = max(int(param(params, "n")), H4_VOL_LOOKBACK)
+    else:
+        days = int(param(params, "n" if hypothesis == "H1" else "lookback"))
     scale = market.candles_per_day if hypothesis in SLEEVE_HYPOTHESES else 1
-    return int(param(params, key)) * scale
+    return days * scale
 
 
 def sleeve_targets(hypothesis: str, params: Params, market: Market, asset: str) -> pd.Series:
@@ -178,11 +187,20 @@ def sleeve_targets(hypothesis: str, params: Params, market: Market, asset: str) 
     scale = market.candles_per_day  # lookbacks are registered in days; 4h runs scale them ×6
     if hypothesis == "H1":
         signal = h1_trend_filter(raw, int(param(params, "n")) * scale, param(params, "band"))
-    else:
+    elif hypothesis == "H3":
         signal = h3_vol_target(
             raw,
             param(params, "target_vol"),
             int(param(params, "lookback")) * scale,
+            market.periods_per_year,
+        )
+    else:
+        signal = h4_trend_vol(
+            raw,
+            int(param(params, "n")) * scale,
+            H4_BAND,
+            param(params, "target_vol"),
+            H4_VOL_LOOKBACK * scale,
             market.periods_per_year,
         )
     return signal.reindex(market.closes.index).ffill().fillna(0.0)
@@ -210,7 +228,7 @@ def run_variant(
 ) -> Evaluation:
     start, end = window
     if hypothesis in SLEEVE_HYPOTHESES:
-        band = H3_REBALANCE_BAND if hypothesis == "H3" else 0.0
+        band = REBALANCE_BANDS[hypothesis]
         sleeves = {}
         for asset in ASSETS:
             targets = sleeve_targets(hypothesis, params, market, asset).to_frame(asset)
@@ -446,19 +464,28 @@ def prescreen(hypothesis: str, root: Path | None = None) -> Prescreen:
             )
         )
 
+    def binance_positive() -> Check:  # H1 and H4 kill rule
+        cagr = binance.portfolio.cagr if binance else math.nan
+        return Check(
+            f"{hypothesis} kill: CAGR > 0 at 2× costs on Binance USDT too",
+            binance is not None and cagr > 0,
+            f"{cagr:.1%}" if binance else "Binance data missing",
+        )
+
+    def turnover_capped() -> Check:  # H3 and H4 kill rule
+        turnover = chosen.portfolio.turnover_per_year
+        return Check(
+            f"{hypothesis} kill: turnover ≤ 400% per year", turnover <= 4.0, f"{turnover:.0%}"
+        )
+
     if hypothesis == "H1":
         corner = selected == (("n", 50), ("band", 0.0))
         extra.append(
             Check("H1 kill: not the fastest corner (n=50, band=0%)", not corner, label(selected))
         )
-        binance_cagr = binance.portfolio.cagr if binance else math.nan
-        extra.append(
-            Check(
-                "H1 kill: CAGR > 0 at 2× costs on Binance USDT too",
-                binance is not None and binance_cagr > 0,
-                f"{binance_cagr:.1%}" if binance else "Binance data missing",
-            )
-        )
+        extra.append(binance_positive())
+    elif hypothesis == "H4":
+        extra += [binance_positive(), turnover_capped()]
     elif hypothesis == "H2":
         h1 = run_grid("H1", market, COST_STRESS, window)
         h1_selected = h1[select("H1", h1)]
@@ -479,8 +506,7 @@ def prescreen(hypothesis: str, root: Path | None = None) -> Prescreen:
             )
         )
     else:
-        turnover = chosen.portfolio.turnover_per_year
-        extra.append(Check("H3 kill: turnover ≤ 400% per year", turnover <= 4.0, f"{turnover:.0%}"))
+        extra.append(turnover_capped())
 
     checks = pass_rule(hypothesis, evaluations, selected, benchmarks, extra)
     return Prescreen(
