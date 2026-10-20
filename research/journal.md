@@ -15,6 +15,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 7 | 2026-10-19 | H3 | Vol targeting, 12-variant grid; selected target_vol=30%, lookback=60 | Corrected Kraken data, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 12.5% CAGR, −47.7% DD, Sharpe 0.54, Calmar 0.26 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: BTC Sharpe 0.33 < 0.44; −3.3% CAGR without the best year. Cumulative variants tested: 46. |
 | 8 | 2026-10-20 | H4 (post-hoc) | Trend filter × vol sizing, 16-variant grid; selected n=50, target_vol=60% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 42.0% CAGR, −46.7% DD, Sharpe 1.08, Calmar 0.90 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: DD 46.7% > 40% (BTC 54.4%, ETH 45.9%); plateau fails; turnover 940%/yr > 400%. Cumulative variants tested: 62. |
 | 9 | 2026-10-20 | H5 (post-hoc ×2) | H4's rule fixed at n=150, target_vol=30%, plus 4 plateau neighbours (1 new: target_vol=20%) | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 21.9% CAGR, −27.3% DD, Sharpe 0.99, Calmar 0.80 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: plateau neighbour n=200/30% is 30.1% below (limit 30%). Everything else passed. Both Phase 1 iterations used, so the plan's stop rule is triggered. Cumulative variants tested: 63. |
+| 10 | 2026-10-20 | H5 (learning path, amendment A1) | Freqtrade strategy `H5TrendVol` (same rule; no new parameters) | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Bitvavo 2020-04 → 2022) | 0.60%/side | Freqtrade 2.715× vs research engine 2.693× final equity; DD −26.9% vs −27.3%; 23/24 positions identical | **Parity OK** after fixing 2 bugs in the strategy. Not evidence: H5 stays killed. Variants: still 63. |
 
 ## Notes
 
@@ -222,3 +223,54 @@ tests matters: the more variants you try, the more likely the best one is luck (
   - **That rule is now triggered.**
   - The validation split (2023–2024) and the holdout (2025-01 → 2026-09) remain **unopened**.
 - Multiple-testing count: 63 variants (62 + 1 new neighbour).
+
+### #10 — Learning path: H5 as a Freqtrade strategy, checked against the research engine
+- Context: PROJECT_PLAN.md amendment A1 (learning-only, dry-run only). This checks the *implementation*. It's not a
+  test of the strategy, and no validation or holdout data was used: exports were cut at 2022-12-31.
+- Strategy: `user_data/strategies/h5_trend_vol.py`. It's self-contained, because the Docker image has no
+  `aitradingbot` package.
+  - Unit tests in `tests/test_freqtrade_strategy.py` check that its indicators equal
+    `h4_trend_vol` / `h1_trend_filter` / `h3_vol_target` exactly, and that they never look ahead.
+  - They also check the resize maths.
+- Command, with Kraken 1d exported to Freqtrade's format:
+  `freqtrade backtesting --strategy H5TrendVol --timeframe 1d --timerange 20171231-20230101 --fee 0.006`, run on a
+  €10,000 wallet so that minimum orders don't interfere.
+- **Two bugs found in the strategy, both fixed:**
+  1. **Sleeve equity double-counted partial-sell gains.** `wallets.get_starting_balance()` already includes open
+     trades' realised profit, and the strategy added it again. That overstated equity, so exposure was understated
+     and resizes went up. Fix: use the fixed starting capital from the config. The formula now matches an
+     independent cash ledger on all 1,692 checks.
+  2. **Partial sells were too big.** Freqtrade sells `|stake| × amount / trade.stake_amount`, a share of the *cost
+     basis*, not of market value.
+     - On 2019-04-03 a cut from 100% to 48% left 38%, and the next day it bought back (double fees).
+     - Fix: convert euros of market value into Freqtrade's unit. There's a regression test for it.
+  - Before the fixes the backtest showed 25.5% CAGR, then 19.6%; after both it shows 22.1%. **A dry-run with these
+    bugs would have traded wrongly without anyone noticing.**
+- **Parity after the fixes** (Kraken, 2018–2022):
+
+  |  | Freqtrade | Research engine |
+  |---|---:|---:|
+  | Final equity | 2.715× | 2.693× |
+  | CAGR | 22.1% | 21.9% |
+  | Max DD | −26.9% | −27.3% |
+  | Sharpe | 1.01 | 0.99 |
+
+  - 23 of 24 positions open and close on the same days. Orders: BTC 56/58 identical, ETH 52/53.
+  - The remaining differences:
+    - The Kraken 2018-01-12/13 gap: Freqtrade fills missing candles with the previous close. That shifts SMA/vol
+      until mid-February 2018 and moves one BTC entry by a day.
+    - 3 resizes that sit right at the 10-point threshold.
+- **Bitvavo check (2020-04-11 → 2022):** Freqtrade needs 400 startup candles, so it can only start there.
+  - Orders are again almost identical (BTC 34/36, ETH 32/33).
+  - But final equity differs (2.53× vs 2.26×). The whole gap is **one missing candle on 2022-11-09**, the FTX crash
+    day.
+    - Freqtrade fills it at the previous close and "sells" both sleeves at the pre-crash price, a fill that couldn't
+      have happened.
+    - The research engine blocks trading on missing candles and sells the next day.
+  - **Lesson: a Freqtrade backtest across missing candles can invent fills.** Check gaps before trusting one.
+- Freqtrade's own checks:
+  - `lookahead-analysis`: no bias (20 signals).
+  - `recursive-analysis`: no indicator variance across startups of 150, 200, 300, 400 and 600 candles.
+- €100 wallet on Bitvavo: identical to the €10,000 run. A 10-point resize of a €50 sleeve is ≥ €5, so Bitvavo's
+  minimum order is never binding, but it's exactly at the limit.
+- Variants: still 63. Same rule, same parameters, and no decision depends on these numbers.

@@ -3,6 +3,7 @@
 *Version 1.1 (free-hosting update) · 19 October 2026 · Spot crypto (BTC, ETH) · Bulgaria / EU · €100 trading capital · 10–20 h/week*
 
 > **Status (20 Oct 2026): closed at Phase 1 under its stop rule.** All five hypotheses (H1–H5) failed Gate 1, so Phases 2–5 were not started and nothing traded. See [research/reports/phase1-summary.md](research/reports/phase1-summary.md).
+> **Since then: learning-only path (amendment A1, below Phase 1).** It runs Phase 3's engineering and operations work in dry-run only, with no money and no claim of an edge.
 
 > **Disclaimer.** This is not financial, tax or legal advice, and I am not a licensed adviser. It is a plan for a careful engineering and research experiment. It does not recommend any investment. Facts about exchanges, fees and tax change often. Section 12 lists what I could not fully verify.
 
@@ -628,6 +629,32 @@ Every phase ends with a **gate**. Write down the result honestly in `research/re
 **Kill / iterate criteria**
 - [x] If none pass, register up to 2 new hypotheses and repeat once. *(Done: H4 and H5, journal #8–#9.)*
 - [x] If those fail too, **stop**. Consider monthly DCA instead, and count the project as a learning success. (This is a perfectly respectable outcome.) **Triggered 20 Oct 2026** (journal #9) and **confirmed by the owner the same day**: Phase 1 closed, summary in `research/reports/phase1-summary.md`. The validation and holdout splits are still unopened.
+
+### Amendment A1 — Learning-only path (20 Oct 2026)
+
+**Why:** after Phase 1 closed, you chose to keep building for the engineering and operations skills, without trading.
+
+**What it is:** Phase 3's build and operations work (paper trading), using **H5** as the strategy.
+- H5 is the most cautious rule tested, and it exercises every order path: entry, partial resize and full exit.
+- Steps:
+  1. Implement H5 as a Freqtrade strategy. Check it against the research engine on **development data only**
+     (2018–2022). Run `lookahead-analysis` and `recursive-analysis`. **Done 20 Oct 2026** (journal #10): parity is
+     OK after fixing two strategy bugs, and both analyses are clean.
+  2. Dry-run it, first on your PC, then on the free host (§3.7). You activate the accounts.
+  3. Monitoring from §9.1: Telegram alerts (you create the bot and put its token in `config.private.json`
+     yourself) and a heartbeat.
+  4. Runbook and fire drills from Phase 3.
+  5. Run for 8 weeks against Gate 3's **operations** criteria: uptime, memory, signal parity, exceptions and fire
+     drills.
+
+**What it isn't:**
+- **Not evidence of an edge.** H5 stays killed at Gate 1, and paper P&L is not used for any decision.
+- **No real money, and no exchange API keys.** Dry-run uses public market data, and `config.json` stays in dry-run
+  (enforced by a test). Phase 4 stays locked.
+- **The validation (2023–2024) and holdout (2025-01 → 2026-09) splits stay closed.** Backtests use 2018–2022 only;
+  dry-run uses live data from October 2026 onward.
+
+**Exit:** the Gate 3 operations criteria are met, or you stop. Either way, the learning path then ends.
 
 ### Phase 2 — Rigorous backtest (Weeks 6–9, ~40–60 h)
 
