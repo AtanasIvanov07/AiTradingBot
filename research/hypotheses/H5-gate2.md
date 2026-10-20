@@ -117,4 +117,25 @@ market"). For each asset:
 
 ## Result / decision
 
-*(fill in after the run; link the journal entry)*
+**❌ KILLED at Gate 2, validation (2026-10-20)**: report [gate2-H5.md](../reports/gate2-H5.md), journal #12.
+**The holdout was not opened.**
+
+- At modelled costs, 2023–2024:
+  - H5: 35.5% CAGR, −20.4% max drawdown, Sharpe 1.30, Calmar 1.74.
+  - 50/50 buy & hold: 108.4%, −34.8%, 1.76, 3.11.
+- **Failed G1:** Calmar 1.74 against the required 3.74.
+- **Failed G5:** below the random-entry 95th percentile (3.69). H5 beat only 37% of the 1,000 random strategies
+  with the same positions and time in market.
+- Passed:
+  - G2 (20.4% drawdown);
+  - G3 (33.2% at 2× costs);
+  - G4 (all four ±25% variants);
+  - G6 (4 of 4 half-years profitable);
+  - G7 (Bitvavo 34.4% at 2× costs).
+  - 75 orders, so not low confidence.
+- The result was confirmed by an independent re-implementation and by Freqtrade (11 of 11 positions identical).
+- Interpretation:
+  - H5 halved the drawdown, but in a strongly rising market it gave up about two-thirds of the return.
+  - Its in/out timing did no better than chance at the same exposure.
+  - Per the decision rule, H5 is killed for good. No other candidate passed Gate 1, so PROJECT_PLAN.md's Phase 2
+    kill rule says stop.

@@ -4,7 +4,8 @@
 
 > **Status (20 Oct 2026): closed at Phase 1 under its stop rule.** All five hypotheses (H1–H5) failed Gate 1, so Phases 2–5 were not started and nothing traded. See [research/reports/phase1-summary.md](research/reports/phase1-summary.md).
 > **Since then: learning-only path (amendment A1, below Phase 1).** It runs Phase 3's engineering and operations work in dry-run only, with no money and no claim of an edge.
-> **Now: amendment A2, back to the original plan.** H5 goes to Phase 2 (out-of-sample test) by exception. Its Gate 2 rules were registered on 20 Oct 2026 in `research/hypotheses/H5-gate2.md`, before any 2023+ result was computed.
+> **Then: amendment A2, back to the original plan.** H5 went to Phase 2 by exception, under rules registered first (`research/hypotheses/H5-gate2.md`).
+> **Result (20 Oct 2026): H5 killed at Gate 2.** On unseen 2023–2024 data it made 35.5% a year against buy & hold's 108.4%, and its timing beat only 37% of random strategies (journal #12). No candidate is left, so the Phase 2 kill rule says **stop**. The 2025–2026 holdout was never opened.
 
 > **Disclaimer.** This is not financial, tax or legal advice, and I am not a licensed adviser. It is a plan for a careful engineering and research experiment. It does not recommend any investment. Facts about exchanges, fees and tax change often. Section 12 lists what I could not fully verify.
 
@@ -682,6 +683,12 @@ H5 goes into **Phase 2** by exception, despite its Gate 1 miss: one criterion, t
   strategy idea would need a new plan revision. The holdout is only opened if validation passes, so it would stay
   clean for that.
 - A1's operations work (watchdog, parity check, runbook, drills) carries over unchanged, since Phase 3 needs it.
+- **Outcome (20 Oct 2026): H5 failed Gate 2 at validation** (journal #12, `research/reports/gate2-H5.md`).
+  - Failed G1: Calmar 1.74 against 3.74 needed.
+  - Failed G5: it beat only 37% of 1,000 random-entry runs.
+  - Passed: drawdown, costs, robustness, walk-forward and Bitvavo.
+  - The holdout stays closed. Phase 2's kill rule applies: no candidate is left, so **stop**, unless a new plan
+    revision brings a genuinely new strategy idea.
 
 ### Phase 2 — Rigorous backtest (Weeks 6–9, ~40–60 h)
 

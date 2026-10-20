@@ -17,6 +17,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 9 | 2026-10-20 | H5 (post-hoc ×2) | H4's rule fixed at n=150, target_vol=30%, plus 4 plateau neighbours (1 new: target_vol=20%) | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 21.9% CAGR, −27.3% DD, Sharpe 0.99, Calmar 0.80 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: plateau neighbour n=200/30% is 30.1% below (limit 30%). Everything else passed. Both Phase 1 iterations used, so the plan's stop rule is triggered. Cumulative variants tested: 63. |
 | 10 | 2026-10-20 | H5 (learning path, amendment A1) | Freqtrade strategy `H5TrendVol` (same rule; no new parameters) | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Bitvavo 2020-04 → 2022) | 0.60%/side | Freqtrade 2.715× vs research engine 2.693× final equity; DD −26.9% vs −27.3%; 23/24 positions identical | **Parity OK** after fixing 2 bugs in the strategy. Not evidence: H5 stays killed. Variants: still 63. |
 | 11 | 2026-10-20 | H5 (learning path, A1) | Dry-run `H5TrendVol` + watchdog, parity tool, fire drills | Live Bitvavo data from 2026-10-20 (paper, €100) | Bitvavo fee 0.25% (dry-run) | Bot running on the PC; 2 paper positions; drills D1–D5 passed (1.3–7 s) | **8-week Gate 3 operations clock started.** Operations only; no strategy result. |
+| 12 | 2026-10-20 | H5 Gate 2 (exception, amendment A2) | Fixed H5 + 4 ±25% variants, 1,000 random-entry runs | Kraken BTC/ETH-EUR 1d, **validation 2023–2024** (first look); + Bitvavo, Binance | 0.30%/side (G3 and G7 at 0.60%) | 35.5% CAGR, −20.4% DD, Sharpe 1.30, Calmar 1.74 vs 50/50 B&H 108.4%, −34.8%, 1.76, 3.11 | **KILL**: G1 (Calmar 1.74 < 3.74) and G5 (beats only 37% of random runs). G2, G3, G4, G6, G7 pass. **Holdout stays closed.** Variants: 67. |
 
 ## Notes
 
@@ -319,3 +320,56 @@ tests matters: the more variants you try, the more likely the best one is luck (
   ufw, private config) and a systemd unit for the watchdog.
 - Waiting on you: Telegram bot and token, Healthchecks URL, Azure or Oracle VM, and the API-key revocation drill on
   a test key.
+
+### #12 — H5 Gate 2 (Phase 2 out-of-sample test, by exception)
+- Context:
+  - Amendment A2 brought the project back to the original goal, so H5 went into Phase 2 despite its 0.1-point Gate 1
+    miss.
+  - Rules registered before the run: `research/hypotheses/H5-gate2.md`.
+  - Command: `python -m aitradingbot.analysis.gate2 --out research/reports/gate2-H5.md`, run on committed code
+    `1474bac` with a clean tree.
+  - **This is the first time any strategy result on 2023+ data was computed.**
+- Decision: **KILL at validation.** The holdout (2025-01 → 2026-09) was **not opened** and stays clean.
+- Validation 2023–2024, at modelled costs (0.30% per side):
+
+  |  | CAGR | Max DD | Sharpe | Calmar |
+  |---|---:|---:|---:|---:|
+  | H5 | 35.5% | −20.4% | 1.30 | 1.74 |
+  | 50/50 buy & hold | 108.4% | −34.8% | 1.76 | 3.11 |
+
+  - BTC buy & hold went from €15,424 to €90,106 (×5.8); ETH from €1,115 to €3,219 (×2.9).
+- **Failed:**
+  - **G1:** Calmar 1.74 against the required 1.2 × 3.11 = 3.74. Not borderline.
+  - **G5:** H5's Calmar 1.74 was below the random-entry 95th percentile of 3.69. In fact it beat only **37%** of
+    the 1,000 random strategies (median 1.99, 5th percentile 1.11). Those had the same positions, durations, time in
+    market (about 80%) and average size.
+- **Passed:**
+  - G2 (drawdown 20.4%);
+  - G3 (33.2% CAGR at 2× costs);
+  - G4 (every ±25% variant kept its Sharpe: 1.30–1.43 against a floor of 0.91);
+  - G6 (all 4 half-years profitable: +10.0%, +16.5%, +35.2%, +6.1%);
+  - G7 (Bitvavo 34.4% at 2× costs).
+  - Orders: 75, so ≥ 50 and not low confidence.
+- **What it means:**
+  - H5 did what it was built for in one sense: it lost much less in the bad stretches (drawdown −20% vs −35%).
+  - But in a strongly rising market that safety cost about two-thirds of the return.
+  - **Its timing added no value: random timing with the same exposure did better 63% of the time.** That's the
+    decisive point. The rule's in/out decisions didn't beat chance in 2023–2024; the profit came from being in the
+    market.
+- **Checks on the result:**
+  - The independent re-implementation, with no project imports and data cut off at 2024-12-31, gives 35.6% CAGR,
+    −20.4% DD, Sharpe 1.30, Calmar 1.75.
+  - Buy & hold checked by hand: BTC 140.7%, ETH 69.3%, 50/50 108.1% CAGR.
+  - The Freqtrade backtest of the same candles agrees on all 11 positions.
+- Reported only:
+  - Monte Carlo 95th-percentile drawdown over a holdout-length path: 34.2%.
+  - Deflated Sharpe on development data, 67 trials: 0.87.
+  - Binance USDT: 35.8% CAGR vs buy & hold 104.7%.
+  - 3× costs: 30.9% CAGR.
+  - SOL/EUR skipped, as registered.
+- Cosmetic: the report labels the target-vol variants "22%" and "38%" (whole-percent formatting). The runs used
+  22.5% and 37.5% as registered.
+- **Consequence (PROJECT_PLAN.md Phase 2 kill rule):** no other hypothesis passed Gate 1, so the plan says **stop**:
+  DCA instead, learning success.
+  - The validation split is now spent.
+  - Only the holdout and new live data remain clean, for any genuinely new strategy under a new plan.
