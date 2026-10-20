@@ -14,6 +14,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 6 | 2026-10-19 | H2 (re-run) | Same 15-variant grid; selected lookback=30, buffer=0% | Corrected Kraken data, dev 2018–2022 | 0.60%/side | 37.0% CAGR, −79.8% DD, Sharpe 0.80 | **KILL** (unchanged): DD, plateau, loses to H1 (0.46 vs 0.83). |
 | 7 | 2026-10-19 | H3 | Vol targeting, 12-variant grid; selected target_vol=30%, lookback=60 | Corrected Kraken data, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 12.5% CAGR, −47.7% DD, Sharpe 0.54, Calmar 0.26 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: BTC Sharpe 0.33 < 0.44; −3.3% CAGR without the best year. Cumulative variants tested: 46. |
 | 8 | 2026-10-20 | H4 (post-hoc) | Trend filter × vol sizing, 16-variant grid; selected n=50, target_vol=60% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 42.0% CAGR, −46.7% DD, Sharpe 1.08, Calmar 0.90 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: DD 46.7% > 40% (BTC 54.4%, ETH 45.9%); plateau fails; turnover 940%/yr > 400%. Cumulative variants tested: 62. |
+| 9 | 2026-10-20 | H5 (post-hoc ×2) | H4's rule fixed at n=150, target_vol=30%, plus 4 plateau neighbours (1 new: target_vol=20%) | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 21.9% CAGR, −27.3% DD, Sharpe 0.99, Calmar 0.80 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: plateau neighbour n=200/30% is 30.1% below (limit 30%). Everything else passed. Both Phase 1 iterations used, so the plan's stop rule is triggered. Cumulative variants tested: 63. |
 
 ## Notes
 
@@ -179,3 +180,45 @@ tests matters: the more variants you try, the more likely the best one is luck (
     almost no evidence.
   - Only the untouched validation split (2023–2024) could test it.
 - Multiple-testing count so far: 62 variants (46 + 16).
+
+### #9 — H5 pre-screen (Gate 1, post-hoc twice over)
+- Command: `python -m aitradingbot.analysis.prescreen H5 --out research/reports/prescreen-H5.md`, run on committed code
+  `aa077ca` with a clean tree.
+- Runs: the fixed variant and its 4 plateau neighbours.
+  - The fixed variant and 3 of the neighbours repeat H4 grid runs, with identical numbers.
+  - Only n=150/20% is new.
+- Decision: **KILL** under the registered rules, on **one criterion only**.
+  - **Plateau (criterion 6):** neighbour n=200/30% has an averaged Calmar of 0.4956 (BTC 0.436, ETH 0.555). H5's own
+    is 0.7090, so the floor is 0.4963.
+  - The neighbour is 30.10% below; the limit is 30%.
+  - The card flagged this neighbour as borderline before the run, and committed to not adjusting the rule to fit.
+- Everything else passed:
+  - criteria 1–5 (portfolio −27.3% DD; BTC −31.5%, ETH −30.3%);
+  - criterion 7 (10.1% CAGR without the best year);
+  - the Binance kill check (23.7% CAGR, −26.9% DD);
+  - turnover (276%/yr).
+  - The other three neighbours are within 12% of H5's Calmar. The new one, n=150/20%, made 15.1% CAGR with −20.8% DD
+    and an averaged Calmar of 0.69.
+- Bug check: the independent re-implementation from #8 matched the fixed variant (CAGR 21.9%, DD −27.3%, Sharpe 0.99,
+  turnover 276%; per-asset Calmar 0.649 / 0.770 vs the engine's 0.649 / 0.769).
+  - For the failing neighbour it gives an averaged Calmar of 0.4960, i.e. 30.11% below.
+  - So both implementations put it on the failing side, by about 0.1 point.
+- Informational:
+  - Costs barely matter at this turnover: 22.7% CAGR at 1×, 21.6% at 3×.
+  - Kraken 4h: 23.8% CAGR, −26.9% DD.
+  - Bitvavo, from 2019-08 (mostly a rising market): 21.1% CAGR vs buy & hold's 43.4%, with −34.2% vs −75.4% DD, so
+    Calmar 0.62 vs 0.58.
+  - That's an early sign of the Gate 2 concern in the card: in a strong rise, this rule keeps the drawdown small but
+    makes about half of buy & hold's return.
+- What it means:
+  - The slow-trend, low-volatility end of the H4 family is the closest any hypothesis came to passing.
+  - But the slow side of its plateau is clearly weaker (n=200: BTC Calmar 0.44 vs 0.65), and the result missed by a
+    hair.
+  - Under pre-registration, a miss by 0.1 point is still a miss. Moving the line now would make every earlier decision
+    meaningless.
+- **Phase 1 outcome: H1–H5 all killed at Gate 1.** Both allowed iterations (H4, H5) are used.
+  - PROJECT_PLAN.md §7 Phase 1: "If those fail too, **stop**. Consider monthly DCA instead, and count the project as
+    a learning success."
+  - **That rule is now triggered.**
+  - The validation split (2023–2024) and the holdout (2025-01 → 2026-09) remain **unopened**.
+- Multiple-testing count: 63 variants (62 + 1 new neighbour).
