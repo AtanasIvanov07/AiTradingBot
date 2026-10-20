@@ -16,6 +16,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 8 | 2026-10-20 | H4 (post-hoc) | Trend filter × vol sizing, 16-variant grid; selected n=50, target_vol=60% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 42.0% CAGR, −46.7% DD, Sharpe 1.08, Calmar 0.90 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: DD 46.7% > 40% (BTC 54.4%, ETH 45.9%); plateau fails; turnover 940%/yr > 400%. Cumulative variants tested: 62. |
 | 9 | 2026-10-20 | H5 (post-hoc ×2) | H4's rule fixed at n=150, target_vol=30%, plus 4 plateau neighbours (1 new: target_vol=20%) | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 21.9% CAGR, −27.3% DD, Sharpe 0.99, Calmar 0.80 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: plateau neighbour n=200/30% is 30.1% below (limit 30%). Everything else passed. Both Phase 1 iterations used, so the plan's stop rule is triggered. Cumulative variants tested: 63. |
 | 10 | 2026-10-20 | H5 (learning path, amendment A1) | Freqtrade strategy `H5TrendVol` (same rule; no new parameters) | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Bitvavo 2020-04 → 2022) | 0.60%/side | Freqtrade 2.715× vs research engine 2.693× final equity; DD −26.9% vs −27.3%; 23/24 positions identical | **Parity OK** after fixing 2 bugs in the strategy. Not evidence: H5 stays killed. Variants: still 63. |
+| 11 | 2026-10-20 | H5 (learning path, A1) | Dry-run `H5TrendVol` + watchdog, parity tool, fire drills | Live Bitvavo data from 2026-10-20 (paper, €100) | Bitvavo fee 0.25% (dry-run) | Bot running on the PC; 2 paper positions; drills D1–D5 passed (1.3–7 s) | **8-week Gate 3 operations clock started.** Operations only; no strategy result. |
 
 ## Notes
 
@@ -274,3 +275,47 @@ tests matters: the more variants you try, the more likely the best one is luck (
 - €100 wallet on Bitvavo: identical to the €10,000 run. A 10-point resize of a €50 sleeve is ≥ €5, so Bitvavo's
   minimum order is never binding, but it's exactly at the limit.
 - Variants: still 63. Same rule, same parameters, and no decision depends on these numbers.
+
+### #11 — Learning path: dry-run started, operations tooling, fire drills
+- **Dry-run (paper trading) on the Windows PC since 2026-10-20 18:55 UTC**: `ops\windows\start-dryrun.ps1`.
+  - Freqtrade 2026.9, H5TrendVol, Bitvavo market data, €100 paper wallet, market orders. Bitvavo's 0.25% taker fee
+    is used by the dry-run.
+  - On start the last closed candle (2026-10-19) had BTC target 0.947 and ETH 0.857, so the bot bought both at
+    once (€47.37 BTC, €42.85 ETH). In research those entries would have filled at the 2026-10-20 00:00 open. Only
+    the first day differs, which is why the parity tool doesn't count bot-start-day orders.
+  - Config change for parity with the research engine: market orders (taker, `price_side: other`) instead of
+    limit orders at the same side.
+- **Watchdog** (`src/aitradingbot/ops/watchdog.py`, every 2 minutes):
+  - Triggers:
+    - API alive, bot loop running, dry-run mode;
+    - stale candles;
+    - > 5 errors in 10 min;
+    - drawdown 20% / 30%, and daily loss 5%;
+    - unexpected positions;
+    - price > 3% off Kraken;
+    - clock drift.
+  - Actions: `/stopentry`, `/forceexit all`, `/stop`. Only the daily-loss pause resumes by itself; everything else
+    waits for `--resume` after a written review. There's also an `--emergency` command.
+  - Daily report after 08:00, and a daily SQLite backup (14 kept).
+  - Equity is `starting capital + profit`, because `/balance` values coins with cached tickers that lag.
+- **Weekly parity check** (`src/aitradingbot/ops/parity.py`): downloads fresh Bitvavo candles, backtests the dry-run
+  days at the dry-run fee, and matches orders by day, pair and side (value within 5%).
+  - It drops the backtest's automatic close on its last candle, and doesn't count bot-start-day orders.
+  - A smoke run over 2026-10-05 → 10-19 worked end to end. There were no dry-run orders yet, so it isn't a parity
+    result.
+- **Fire drills** on a separate drill bot (`ops/fire-drills.md`): D1 manual emergency 2.3 s, D2 drawdown > 30%
+  3.1 s, D3 stale data 1.3 s, D4 crash and recovery (API back in 7 s, same trades restored from SQLite), D5
+  exchange unreachable (Freqtrade exits; watchdog flags it).
+- **Bugs found and fixed while building:**
+  - the watchdog crashed when a just-restarted bot had no finished loop yet (found by D4);
+  - the Windows start script skipped the watchdog when the bot was already running;
+  - the backup left SQLite connections open, so Windows couldn't delete old copies (found by a test);
+  - the parity tool counted dry-run orders after its window and the backtest's final forced close.
+- **Learned:**
+  - Freqtrade locks a pair until the next candle after any exit.
+  - ccxt ignores `HTTPS_PROXY`.
+  - On Windows nothing restarts a crashed bot.
+- **Linux host prepared, not used yet**: `ops/linux/setup-host.sh` (swap, Docker, chrony, unattended upgrades,
+  ufw, private config) and a systemd unit for the watchdog.
+- Waiting on you: Telegram bot and token, Healthchecks URL, Azure or Oracle VM, and the API-key revocation drill on
+  a test key.

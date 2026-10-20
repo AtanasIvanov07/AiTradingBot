@@ -641,11 +641,19 @@ Every phase ends with a **gate**. Write down the result honestly in `research/re
      (2018–2022). Run `lookahead-analysis` and `recursive-analysis`. **Done 20 Oct 2026** (journal #10): parity is
      OK after fixing two strategy bugs, and both analyses are clean.
   2. Dry-run it, first on your PC, then on the free host (§3.7). You activate the accounts.
+     **PC dry-run running since 20 Oct 2026** (journal #11; `ops\windows\start-dryrun.ps1`). The Linux host is
+     prepared (`ops/linux/setup-host.sh`, systemd watchdog) and waits for your Azure or Oracle account.
   3. Monitoring from §9.1: Telegram alerts (you create the bot and put its token in `config.private.json`
      yourself) and a heartbeat.
-  4. Runbook and fire drills from Phase 3.
+     **The watchdog is done** (`python -m aitradingbot.ops.watchdog`). Every 2 minutes it checks the §6.4/§6.6
+     triggers and acts on them. It also writes a daily report and makes daily DB backups. Telegram and
+     Healthchecks are wired in and switch on once you add your token and URL.
+  4. Runbook and fire drills from Phase 3. **The runbook is written** (`ops/runbook.md`). **Drills D1–D5 passed**
+     on a separate drill bot (`ops/fire-drills.md`); the Telegram, heartbeat and API-key drills wait for your
+     accounts. The weekly parity check is built (`python -m aitradingbot.ops.parity`).
   5. Run for 8 weeks against Gate 3's **operations** criteria: uptime, memory, signal parity, exceptions and fire
-     drills.
+     drills. **The clock started 20 Oct 2026 on the PC.** Gate 3 wants the last 4 weeks on the 24/7 host, so the
+     earliest finish is mid-December 2026, if the host is running by mid-November.
 
 **What it isn't:**
 - **Not evidence of an edge.** H5 stays killed at Gate 1, and paper P&L is not used for any decision.

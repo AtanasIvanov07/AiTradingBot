@@ -1,0 +1,18 @@
+# External watchdog for the Freqtrade bot (PROJECT_PLAN.md section 6.5).
+# Installed by ops/linux/setup-host.sh, which fills in @USER@ and @REPO_DIR@.
+# The watchdog only needs the Python standard library, so the system python3 is enough.
+[Unit]
+Description=AiTradingBot watchdog (checks the dry-run bot every 2 minutes)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+WorkingDirectory=@REPO_DIR@
+Environment=PYTHONPATH=src
+ExecStart=/usr/bin/python3 -m aitradingbot.ops.watchdog --loop 120
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

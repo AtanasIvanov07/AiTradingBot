@@ -67,6 +67,18 @@ class H5TrendVol(IStrategy):
     exit_profit_only = False
     ignore_roi_if_entry_signal = False
 
+    # Market orders, as the research engine assumed (taker fill at the open). Freqtrade requires
+    # entry/exit pricing price_side "other" for these (config.json).
+    order_types = {
+        "entry": "market",
+        "exit": "market",
+        "emergency_exit": "market",
+        "force_entry": "market",
+        "force_exit": "market",
+        "stoploss": "market",
+        "stoploss_on_exchange": False,
+    }
+
     process_only_new_candles = True
     position_adjustment_enable = True
     max_entry_position_adjustment = -1
