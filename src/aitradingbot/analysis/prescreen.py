@@ -3,8 +3,9 @@
 Usage:
     python -m aitradingbot.analysis.prescreen H1 --out research/reports/prescreen-H1.md
 
-Everything here mirrors a registered rule: the grids (cards H1–H3), costs (§4), benchmarks (§5),
-metrics (§6), the pass rule (§7), the plateau-median selection (§8) and each card's kill criteria.
+Everything here mirrors a registered rule: the grids (cards H1–H4), H5's fixed variant and its
+plateau neighbours, costs (§4), benchmarks (§5), metrics (§6), the pass rule (§7), the
+plateau-median selection (§8) and each card's kill criteria.
 Changing any of it requires a dated amendment in the conventions file first.
 Only the development split (2018–2022) is used. Validation and holdout data are never loaded here.
 """
@@ -41,25 +42,31 @@ QUOTES = {"kraken": "EUR", "bitvavo": "EUR", "binance": "USDT"}
 PRIMARY = "kraken"
 VARIANT_CAP = 20
 
+Params = tuple[tuple[str, float], ...]
+
 TITLES = {
     "H1": "Daily trend following (SMA filter with band)",
     "H2": "Weekly dual-momentum rotation BTC / ETH / EUR",
     "H3": "Volatility-targeted holding",
     "H4": "Trend filter with volatility-targeted sizing (post-hoc)",
+    "H5": "H4's rule at one fixed setting (post-hoc)",
 }
 GRIDS: dict[str, dict[str, list[float]]] = {
     "H1": {"n": [50, 75, 100, 125, 150, 200], "band": [0.0, 0.02, 0.04]},
     "H2": {"lookback": [30, 60, 90, 120, 180], "buffer": [0.0, 0.05, 0.10]},
     "H3": {"target_vol": [0.30, 0.40, 0.50, 0.60], "lookback": [20, 30, 60]},
     "H4": {"n": [50, 100, 150, 200], "target_vol": [0.30, 0.40, 0.50, 0.60]},
+    # H5 defines only the neighbour spacing: H4's steps, plus 20% for the untested low side
+    "H5": {"n": [100, 150, 200], "target_vol": [0.20, 0.30, 0.40]},
 }
-SLEEVE_HYPOTHESES = {"H1", "H3", "H4"}  # 50% of capital per asset, run independently
-REBALANCE_BANDS = {"H1": 0.0, "H3": 0.10, "H4": 0.10}
-H4_BAND = 0.02  # fixed at registration: middle of H1's band grid
-H4_VOL_LOOKBACK = 30  # fixed at registration: middle of H3's lookback grid (days)
+# Cards with one registered variant: nothing is selected (§8), and only it and its immediate
+# neighbours (for the §7.6 plateau) are run, not the full spacing grid.
+FIXED: dict[str, Params] = {"H5": (("n", 150), ("target_vol", 0.30))}
+SLEEVE_HYPOTHESES = {"H1", "H3", "H4", "H5"}  # 50% of capital per asset, run independently
+REBALANCE_BANDS = {"H1": 0.0, "H3": 0.10, "H4": 0.10, "H5": 0.10}
+H4_BAND = 0.02  # fixed at registration: middle of H1's band grid (H5 reuses it)
+H4_VOL_LOOKBACK = 30  # fixed at registration: middle of H3's lookback grid, in days (H5 reuses it)
 WEDNESDAY = 2
-
-Params = tuple[tuple[str, float], ...]
 
 
 def param(params: Params, name: str) -> float:
@@ -75,6 +82,9 @@ def label(params: Params) -> str:
 
 
 def grid_variants(hypothesis: str) -> list[Params]:
+    if hypothesis in FIXED:
+        fixed = FIXED[hypothesis]
+        return [fixed, *neighbours(hypothesis, fixed)]
     grid = GRIDS[hypothesis]
     names = list(grid)
     variants: list[Params] = [()]
@@ -174,7 +184,7 @@ class Evaluation:
 
 def warmup(hypothesis: str, params: Params, market: Market) -> int:
     """Candles of history the selected variant needs before its first decision."""
-    if hypothesis == "H4":
+    if hypothesis in {"H4", "H5"}:
         days = max(int(param(params, "n")), H4_VOL_LOOKBACK)
     else:
         days = int(param(params, "n" if hypothesis == "H1" else "lookback"))
@@ -194,7 +204,7 @@ def sleeve_targets(hypothesis: str, params: Params, market: Market, asset: str) 
             int(param(params, "lookback")) * scale,
             market.periods_per_year,
         )
-    else:
+    else:  # H4 and H5 share the rule
         signal = h4_trend_vol(
             raw,
             int(param(params, "n")) * scale,
@@ -277,6 +287,8 @@ def selection_scores(hypothesis: str, evaluations: dict[Params, Evaluation]) -> 
 
 
 def select(hypothesis: str, evaluations: dict[Params, Evaluation]) -> Params:
+    if hypothesis in FIXED:
+        return FIXED[hypothesis]  # registered in the card; nothing to select
     scores = selection_scores(hypothesis, evaluations)
     return max(scores, key=lambda p: (scores[p], -evaluations[p].portfolio.trades))
 
@@ -415,13 +427,19 @@ def prescreen(hypothesis: str, root: Path | None = None) -> Prescreen:
     market = load_market(PRIMARY, "1d", root)
     window = development_window(market)
     evaluations = run_grid(hypothesis, market, COST_STRESS, window)
-    scores = selection_scores(hypothesis, evaluations)
+    fixed = hypothesis in FIXED
+    scores = {} if fixed else selection_scores(hypothesis, evaluations)
     selected = select(hypothesis, evaluations)
     benchmarks = run_benchmarks(market, COST_STRESS, window)
     chosen = evaluations[selected]
     extra: list[Check] = []
     informational: list[tuple[str, Evaluation, dict[str, Metrics]]] = []
     notes: list[str] = []
+    if fixed:
+        notes.append(
+            f"{hypothesis}: one fixed variant registered in the card, so nothing is selected; "
+            f"the other {len(evaluations) - 1} runs are its plateau neighbours (criterion 6)"
+        )
 
     def confirm(
         name: str, other: Market | None, run: Callable[[Market], Evaluation]
@@ -464,7 +482,7 @@ def prescreen(hypothesis: str, root: Path | None = None) -> Prescreen:
             )
         )
 
-    def binance_positive() -> Check:  # H1 and H4 kill rule
+    def binance_positive() -> Check:  # H1, H4 and H5 kill rule
         cagr = binance.portfolio.cagr if binance else math.nan
         return Check(
             f"{hypothesis} kill: CAGR > 0 at 2× costs on Binance USDT too",
@@ -472,7 +490,7 @@ def prescreen(hypothesis: str, root: Path | None = None) -> Prescreen:
             f"{cagr:.1%}" if binance else "Binance data missing",
         )
 
-    def turnover_capped() -> Check:  # H3 and H4 kill rule
+    def turnover_capped() -> Check:  # H3, H4 and H5 kill rule
         turnover = chosen.portfolio.turnover_per_year
         return Check(
             f"{hypothesis} kill: turnover ≤ 400% per year", turnover <= 4.0, f"{turnover:.0%}"
@@ -484,7 +502,7 @@ def prescreen(hypothesis: str, root: Path | None = None) -> Prescreen:
             Check("H1 kill: not the fastest corner (n=50, band=0%)", not corner, label(selected))
         )
         extra.append(binance_positive())
-    elif hypothesis == "H4":
+    elif hypothesis in {"H4", "H5"}:
         extra += [binance_positive(), turnover_capped()]
     elif hypothesis == "H2":
         h1 = run_grid("H1", market, COST_STRESS, window)
@@ -574,25 +592,38 @@ def render(screen: Prescreen) -> str:
         row(["---"] + ["---:"] * len(METRIC_HEADER)),
     ]
     lines += [row([name, *metric_cells(m)]) for name, m in screen.benchmarks.items()]
-    lines += [
-        "",
-        "## Grid (2× costs)",
-        "",
-        "Selection score = median Calmar of the variant and its grid neighbours "
-        "(BTC/ETH-averaged for sleeve strategies).",
-        "",
-    ]
+    fixed = h in FIXED
+    if fixed:
+        lines += [
+            "",
+            "## Fixed variant and plateau neighbours (2× costs)",
+            "",
+            "No selection score: the card fixes the variant. "
+            "The other rows are its plateau neighbours.",
+            "",
+        ]
+    else:
+        lines += [
+            "",
+            "## Grid (2× costs)",
+            "",
+            "Selection score = median Calmar of the variant and its grid neighbours "
+            "(BTC/ETH-averaged for sleeve strategies).",
+            "",
+        ]
     asset_cols = [f"{a} Calmar" for a in ASSETS] if h in SLEEVE_HYPOTHESES else []
     header = ["Variant", "Score", *asset_cols, *METRIC_HEADER]
     lines += [row(header), row(["---"] + ["---:"] * (len(header) - 1))]
     for params, evaluation in screen.evaluations.items():
-        marker = " ⬅ selected" if params == screen.selected else ""
+        marker = ""
+        if params == screen.selected:
+            marker = " ⬅ fixed" if fixed else " ⬅ selected"
         assets = [f"{evaluation.per_asset[a].calmar:.2f}" for a in ASSETS] if asset_cols else []
         lines.append(
             row(
                 [
                     label(params) + marker,
-                    f"{screen.scores[params]:.2f}",
+                    f"{screen.scores[params]:.2f}" if params in screen.scores else "—",
                     *assets,
                     *metric_cells(evaluation.portfolio),
                 ]

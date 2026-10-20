@@ -17,6 +17,32 @@ def test_grids_match_the_registered_cards() -> None:
     assert (ps.H4_BAND, ps.H4_VOL_LOOKBACK, ps.REBALANCE_BANDS["H4"]) == (0.02, 30, 0.10)
 
 
+def test_h5_runs_only_its_fixed_variant_and_the_four_neighbours() -> None:
+    fixed = (("n", 150), ("target_vol", 0.30))
+    assert ps.FIXED["H5"] == fixed and ps.REBALANCE_BANDS["H5"] == 0.10
+    variants = ps.grid_variants("H5")
+    assert variants[0] == fixed and len(variants) == 5
+    assert sorted(variants[1:]) == sorted(
+        [
+            (("n", 100), ("target_vol", 0.30)),
+            (("n", 200), ("target_vol", 0.30)),
+            (("n", 150), ("target_vol", 0.20)),
+            (("n", 150), ("target_vol", 0.40)),
+        ]
+    )
+    new = [v for v in variants if v not in ps.grid_variants("H4")]
+    assert new == [(("n", 150), ("target_vol", 0.20))]  # the only run H4 didn't already make
+
+
+def test_h5_select_is_the_fixed_variant_even_if_a_neighbour_scores_higher() -> None:
+    evaluations = {}
+    for params in ps.grid_variants("H5"):
+        value = 3.0 if params == (("n", 100), ("target_vol", 0.30)) else 0.5
+        per_asset = {"BTC": metrics(value), "ETH": metrics(value)}
+        evaluations[params] = ps.Evaluation(params, 0.006, metrics(value), per_asset)
+    assert ps.select("H5", evaluations) == ps.FIXED["H5"]
+
+
 def test_neighbours_are_one_step_in_one_parameter() -> None:
     corner = (("n", 50), ("band", 0.0))
     assert sorted(ps.neighbours("H1", corner)) == sorted(
@@ -85,7 +111,17 @@ def test_h4_targets_are_trend_times_size(tmp_path: Path) -> None:
     assert ps.warmup("H4", (("n", 50), ("target_vol", 0.3)), market) == 50
 
 
-@pytest.mark.parametrize("hypothesis", ["H1", "H2", "H3", "H4"])
+def test_h5_targets_are_h4s_rule(tmp_path: Path) -> None:
+    write_synthetic_market(tmp_path)
+    market = ps.load_market("kraken", "1d", tmp_path)
+    fixed = ps.FIXED["H5"]
+    h5 = ps.sleeve_targets("H5", fixed, market, "ETH")
+    pd.testing.assert_series_equal(h5, ps.sleeve_targets("H4", fixed, market, "ETH"))
+    assert h5.max() > 0
+    assert ps.warmup("H5", fixed, market) == 150
+
+
+@pytest.mark.parametrize("hypothesis", ["H1", "H2", "H3", "H4", "H5"])
 def test_end_to_end_on_synthetic_data(tmp_path: Path, hypothesis: str) -> None:
     write_synthetic_market(tmp_path)
     screen = ps.prescreen(hypothesis, tmp_path)
@@ -98,17 +134,24 @@ def test_end_to_end_on_synthetic_data(tmp_path: Path, hypothesis: str) -> None:
     report = ps.render(screen)
     assert f"Pre-screen {hypothesis}" in report and "## Decision:" in report
     assert "Binance USDT (confirmation 1): data not available, skipped" in report
-    if hypothesis in {"H1", "H4"}:  # no Binance data -> the registered kill check cannot pass
+    if hypothesis in {"H1", "H4", "H5"}:  # no Binance data -> the registered kill check can't pass
         binance = next(c for c in screen.checks if "Binance" in c.criterion)
         assert binance.criterion.startswith(f"{hypothesis} kill")
         assert not binance.passed and not screen.passed
-    if hypothesis in {"H3", "H4"}:
+    if hypothesis in {"H3", "H4", "H5"}:
         assert any(
             c.criterion == f"{hypothesis} kill: turnover ≤ 400% per year" for c in screen.checks
         )
-    if hypothesis == "H4":  # exits to cash, so the standard drawdown bar applies, not H3's
+    if hypothesis in {"H4", "H5"}:  # exits to cash, so the standard drawdown bar applies, not H3's
         assert any(n.startswith("2 Max drawdown ≤ 40%") for n in names)
         assert not any("25% smaller" in n for n in names)
+    if hypothesis == "H5":  # fixed variant: no selection, plateau = its four neighbours
+        assert screen.selected == ps.FIXED["H5"] and screen.scores == {}
+        plateau = sorted(n for n in names if n.startswith("6 Plateau"))
+        expected = [f"6 Plateau: neighbour {ps.label(p)}" for p in ps.grid_variants("H5")[1:]]
+        assert plateau == sorted(expected)
+        assert "⬅ fixed" in report and "⬅ selected" not in report
+        assert "one fixed variant registered in the card" in report
 
 
 def test_confirmation_window_starts_after_warmup(tmp_path: Path) -> None:
