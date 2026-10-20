@@ -13,6 +13,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 5 | 2026-10-19 | H1 (re-run) | Same 18-variant grid; selected n=50, band=4% | Corrected Kraken data, dev 2018–2022 | 0.60%/side | 47.3% CAGR, −57.2% DD, Sharpe 0.99, Calmar 0.83 vs B&H 8.5%, −87.0%, 0.51 | **KILL** (unchanged): DD > 40% in all variants; plateau fails. |
 | 6 | 2026-10-19 | H2 (re-run) | Same 15-variant grid; selected lookback=30, buffer=0% | Corrected Kraken data, dev 2018–2022 | 0.60%/side | 37.0% CAGR, −79.8% DD, Sharpe 0.80 | **KILL** (unchanged): DD, plateau, loses to H1 (0.46 vs 0.83). |
 | 7 | 2026-10-19 | H3 | Vol targeting, 12-variant grid; selected target_vol=30%, lookback=60 | Corrected Kraken data, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 12.5% CAGR, −47.7% DD, Sharpe 0.54, Calmar 0.26 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: BTC Sharpe 0.33 < 0.44; −3.3% CAGR without the best year. Cumulative variants tested: 46. |
+| 8 | 2026-10-20 | H4 (post-hoc) | Trend filter × vol sizing, 16-variant grid; selected n=50, target_vol=60% | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Binance, Bitvavo, 4h informational) | 0.60%/side | 42.0% CAGR, −46.7% DD, Sharpe 1.08, Calmar 0.90 vs B&H 8.5%, −87.0%, 0.51 | **KILL**: DD 46.7% > 40% (BTC 54.4%, ETH 45.9%); plateau fails; turnover 940%/yr > 400%. Cumulative variants tested: 62. |
 
 ## Notes
 
@@ -128,3 +129,53 @@ tests matters: the more variants you try, the more likely the best one is luck (
   informational + 12).
 - Next decision (PROJECT_PLAN.md §7, Phase 1 kill/iterate): either register up to 2 new hypotheses and repeat once,
   or stop and DCA. Any new hypothesis is now informed by these results and must say so.
+
+### #8 — H4 pre-screen (Gate 1, post-hoc hypothesis)
+- Command: `python -m aitradingbot.analysis.prescreen H4 --out research/reports/prescreen-H4.md`, run on committed code
+  `0412937` with a clean tree.
+- Decision: **KILL** under the registered rules. Details are in the H4 card and the report.
+- Why:
+  - **Criterion 2:** the selected variant's drawdown is 46.7% for the portfolio (BTC 54.4%, ETH 45.9%), above the 40%
+    limit.
+  - **Plateau:** both neighbours (n=100/60%, n=50/50%) also fail the drawdown limit.
+  - **Turnover kill:** 940% per year, against a 400% cap.
+  - Passed: criteria 1, 3, 4 and 7 (13.9% CAGR without the best year) and the Binance kill check (39.3% CAGR).
+- What it still tells us:
+  - Combining the two ideas helped on both axes. Sharpe was the best so far (1.08, vs H1's 0.99), and the drawdown was
+    smaller than H1's (−46.7% vs −57.2%).
+  - It still wasn't enough at the variant the rules selected.
+  - Bitvavo (from 2019-04, so no 2018 bear market) made 58.5% CAGR, against 59.6% for buy & hold, with a −53% vs −75%
+    drawdown. Kraken 4h is close to 1d (44.6%, −43.9%).
+- Bug check: an independent re-implementation matched the engine for the selected variant. It uses its own loops for
+  the SMA hysteresis, the rolling std and the sleeve simulation, with no project imports.
+
+  |  | CAGR | Max DD | Turnover |
+  |---|---:|---:|---:|
+  | Independent re-implementation | 42.0% | −46.7% | 941% |
+  | Engine | 42.0% | −46.7% | 940% |
+
+  The per-asset numbers match to 0.1 point, and n=150/30% and n=200/60% match too.
+- Where the turnover comes from (selected variant, per year, as a share of average equity):
+  - Trend entries 4.0× and exits 4.4×. Volatility resizes add only 1.0×.
+  - Over five years that's 50 round trips plus 77 resizes.
+  - Cost drag at 0.60% per side is 5.6% of average equity per year.
+- **A drafting mistake in the card (mine):**
+  - The 400% cap was copied from H3, which is always invested and barely trades (92%/yr).
+  - The card's own estimate for H4, 4–10 round trips per asset per year, implies more than 400% from entries and
+    exits alone at full sleeve size. So the cap was close to unpassable for the fast-trend variants.
+  - Not changed after the fact. It doesn't change the decision, because the drawdown and plateau checks fail on their
+    own.
+  - Lesson for any later card: check that kill thresholds are consistent with the card's own trade estimate.
+- Informational, **not** a decision:
+  - 4 of the 16 variants pass criteria 1–5, criterion 7 and the turnover cap on their own: n=100/30%, n=150/30%,
+    n=150/40% and n=200/30%. Their plateau and Binance checks weren't evaluated.
+  - All four combine the lowest target volatility with a slower trend.
+  - The §8 selection rule picks the highest smoothed Calmar, which here sits at the fast, aggressive corner that breaks
+    the drawdown limit.
+  - Choosing one of the four now would mean picking after seeing the results, which this card doesn't allow.
+  - This scan re-evaluated the same 16 variants; it doesn't add variants.
+- Phase 1 allowance: H4 used the first of the two new hypotheses, so one is left (PROJECT_PLAN.md §7).
+  - Any H5 built on the observation above would be fitted to the development data twice over, so its Gate 1 would carry
+    almost no evidence.
+  - Only the untouched validation split (2023–2024) could test it.
+- Multiple-testing count so far: 62 variants (46 + 16).
