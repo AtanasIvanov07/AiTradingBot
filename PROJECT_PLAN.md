@@ -4,6 +4,7 @@
 
 > **Status (20 Oct 2026): closed at Phase 1 under its stop rule.** All five hypotheses (H1–H5) failed Gate 1, so Phases 2–5 were not started and nothing traded. See [research/reports/phase1-summary.md](research/reports/phase1-summary.md).
 > **Since then: learning-only path (amendment A1, below Phase 1).** It runs Phase 3's engineering and operations work in dry-run only, with no money and no claim of an edge.
+> **Now: amendment A2, back to the original plan.** H5 goes to Phase 2 (out-of-sample test) by exception. Its Gate 2 rules were registered on 20 Oct 2026 in `research/hypotheses/H5-gate2.md`, before any 2023+ result was computed.
 
 > **Disclaimer.** This is not financial, tax or legal advice, and I am not a licensed adviser. It is a plan for a careful engineering and research experiment. It does not recommend any investment. Facts about exchanges, fees and tax change often. Section 12 lists what I could not fully verify.
 
@@ -663,6 +664,24 @@ Every phase ends with a **gate**. Write down the result honestly in `research/re
   dry-run uses live data from October 2026 onward.
 
 **Exit:** the Gate 3 operations criteria are met, or you stop. Either way, the learning path then ends.
+
+### Amendment A2 — Back to the original plan with H5 (20 Oct 2026)
+
+**Decision (yours):** the goal is the original one, a strategy that actually works, not a learning exercise. So
+H5 goes into **Phase 2** by exception, despite its Gate 1 miss: one criterion, the plateau, missed by 0.1 point.
+
+- **Why it's defensible:** H5 is one fixed rule with no parameters left to tune, and its card named Gate 2 on
+  unseen data as its real test. The 2023–2024 validation and 2025–2026 holdout splits are still unopened. So Gate 2
+  is a genuine out-of-sample verdict. The Gate 1 record stays "failed (exception granted)".
+- **How:** the exact Gate 2 tests are fixed in [research/hypotheses/H5-gate2.md](research/hypotheses/H5-gate2.md)
+  **before** any 2023+ result is computed. **Registered 20 Oct 2026**, approved as written.
+- **If H5 passes Gate 2:** the paper trading already running under A1 becomes Phase 3 proper. Its 8-week clock
+  keeps counting unless signal or order logic changes. Then Phase 4 with your €100: you create the API keys and
+  switch to live yourself.
+- **If H5 fails:** it's killed. No candidate is left, so the plan's Phase 2 kill rule says **stop**. A genuinely new
+  strategy idea would need a new plan revision. The holdout is only opened if validation passes, so it would stay
+  clean for that.
+- A1's operations work (watchdog, parity check, runbook, drills) carries over unchanged, since Phase 3 needs it.
 
 ### Phase 2 — Rigorous backtest (Weeks 6–9, ~40–60 h)
 
