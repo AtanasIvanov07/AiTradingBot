@@ -18,6 +18,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 10 | 2026-10-20 | H5 (learning path, amendment A1) | Freqtrade strategy `H5TrendVol` (same rule; no new parameters) | Kraken BTC/ETH-EUR 1d, dev 2018–2022 (+ Bitvavo 2020-04 → 2022) | 0.60%/side | Freqtrade 2.715× vs research engine 2.693× final equity; DD −26.9% vs −27.3%; 23/24 positions identical | **Parity OK** after fixing 2 bugs in the strategy. Not evidence: H5 stays killed. Variants: still 63. |
 | 11 | 2026-10-20 | H5 (learning path, A1) | Dry-run `H5TrendVol` + watchdog, parity tool, fire drills | Live Bitvavo data from 2026-10-20 (paper, €100) | Bitvavo fee 0.25% (dry-run) | Bot running on the PC; 2 paper positions; drills D1–D5 passed (1.3–7 s) | **8-week Gate 3 operations clock started.** Operations only; no strategy result. |
 | 12 | 2026-10-20 | H5 Gate 2 (exception, amendment A2) | Fixed H5 + 4 ±25% variants, 1,000 random-entry runs | Kraken BTC/ETH-EUR 1d, **validation 2023–2024** (first look); + Bitvavo, Binance | 0.30%/side (G3 and G7 at 0.60%) | 35.5% CAGR, −20.4% DD, Sharpe 1.30, Calmar 1.74 vs 50/50 B&H 108.4%, −34.8%, 1.76, 3.11 | **KILL**: G1 (Calmar 1.74 < 3.74) and G5 (beats only 37% of random runs). G2, G3, G4, G6, G7 pass. **Holdout stays closed.** Variants: 67. |
+| 13 | 2026-10-20 | H5 dry-run (A1) | Paper bot + watchdog stopped for good | — | — | Ran 18:55 → about 20:35 UTC (about 1.7 h); 2 paper positions left open in the dry-run DB | **Stopped**, per your decision after the Gate 2 kill. Both had already died around 20:35 UTC (see notes). The 8-week clock is void. |
 
 ## Notes
 
@@ -373,3 +374,32 @@ tests matters: the more variants you try, the more likely the best one is luck (
   DCA instead, learning success.
   - The validation split is now spent.
   - Only the holdout and new live data remain clean, for any genuinely new strategy under a new plan.
+
+### #13 — Paper bot and watchdog stopped
+- Decision (yours): stop the H5 dry-run bot and its watchdog. H5 failed Gate 2, so paper trading it serves no
+  purpose under the original plan.
+- **They had already stopped by themselves.** When the stop was requested, no bot or watchdog process was running.
+  `ops\windows\stop-dryrun.ps1` confirmed it.
+- Timeline from the logs (UTC):
+  - 18:55: bot started.
+  - 20:08: the watchdog's last OK check.
+  - About 20:35: the PC's network failed. The watchdog's DNS lookups failed (`getaddrinfo failed`), and the bot
+    logged `NetworkError` warnings on order-book fetches.
+  - 20:35:49: the watchdog's last entry, CRITICAL "bot API unreachable".
+  - After that, nothing from either process. There was no reboot (last boot was 2026-10-18).
+- **Probable cause:**
+  - Both died together, which a network drop alone doesn't explain: the bot keeps retrying and the watchdog keeps
+    logging.
+  - Most likely the processes were tied to the Claude app session that started them, and ended with it at about
+    that time. Not proven.
+- **What this showed (operations lessons):**
+  1. **Processes started from the assistant's session don't survive it.** A long run on the PC must be started from
+     your own terminal or Windows Task Scheduler. On the Linux host, Docker and systemd handle it.
+  2. **The watchdog saw the failure but couldn't tell anyone.** Telegram and Healthchecks weren't configured.
+  3. **The watchdog died with the bot.** They shared a failure domain, so only an *external* heartbeat
+     (Healthchecks.io, PROJECT_PLAN.md §9.1) catches that.
+  - These are exactly the failures Phase 3 is meant to expose.
+- State left behind: 2 open **paper** positions in `user_data\tradesv3.dryrun.sqlite` (BTC 0.00064545 @ 73,389; ETH
+  0.01976624 @ 2,167.72). No real money and no exchange keys were involved.
+  - The DB, logs and backups stay on disk; they're gitignored.
+  - The 8-week Gate 3 clock is void.
