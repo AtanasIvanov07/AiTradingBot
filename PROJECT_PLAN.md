@@ -2,6 +2,8 @@
 
 *Version 1.1 (free-hosting update) · 19 October 2026 · Spot crypto (BTC, ETH) · Bulgaria / EU · €100 trading capital · 10–20 h/week*
 
+> **Status (20 Oct 2026): closed at Phase 1 under its stop rule.** All five hypotheses (H1–H5) failed Gate 1, so Phases 2–5 were not started and nothing traded. See [research/reports/phase1-summary.md](research/reports/phase1-summary.md).
+
 > **Disclaimer.** This is not financial, tax or legal advice, and I am not a licensed adviser. It is a plan for a careful engineering and research experiment. It does not recommend any investment. Facts about exchanges, fees and tax change often. Section 12 lists what I could not fully verify.
 
 ---
@@ -625,7 +627,7 @@ Every phase ends with a **gate**. Write down the result honestly in `research/re
 
 **Kill / iterate criteria**
 - [x] If none pass, register up to 2 new hypotheses and repeat once. *(Done: H4 and H5, journal #8–#9.)*
-- [ ] If those fail too, **stop**. Consider monthly DCA instead, and count the project as a learning success. (This is a perfectly respectable outcome.) **Triggered 20 Oct 2026** (journal #9). The decision to close Phase 1 is yours to confirm. The validation and holdout splits are still unopened.
+- [x] If those fail too, **stop**. Consider monthly DCA instead, and count the project as a learning success. (This is a perfectly respectable outcome.) **Triggered 20 Oct 2026** (journal #9) and **confirmed by the owner the same day**: Phase 1 closed, summary in `research/reports/phase1-summary.md`. The validation and holdout splits are still unopened.
 
 ### Phase 2 — Rigorous backtest (Weeks 6–9, ~40–60 h)
 
