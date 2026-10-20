@@ -156,11 +156,18 @@ def development_window(
 ) -> tuple[pd.Timestamp, pd.Timestamp]:
     """First and last candle open times evaluated: the development split, shortened at the
     start if the series (plus indicator warm-up) begins later, as Bitvavo's does."""
-    start = DEVELOPMENT[0]
+    return split_window(market, DEVELOPMENT, warmup_candles)
+
+
+def split_window(
+    market: Market, split: tuple[pd.Timestamp, pd.Timestamp], warmup_candles: int = 0
+) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Like ``development_window``, for any split (Gate 2 uses validation and holdout)."""
+    start = split[0]
     warmed = market.first_common() + (warmup_candles + 1) * market.step
     if warmed > start:
         start = warmed.ceil("D")
-    end = DEVELOPMENT[1] + pd.Timedelta(days=1) - market.step
+    end = split[1] + pd.Timedelta(days=1) - market.step
     return start, end
 
 
