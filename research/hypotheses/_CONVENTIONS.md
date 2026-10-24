@@ -93,4 +93,17 @@ A hypothesis passes only if the **selected variant** (§8) meets **all** of thes
 
 ## Amendments
 
-*(none yet)*
+### Amendment 1 — Periods under PROJECT_PLAN.md amendment A3 (registered 2026-10-25)
+
+Applies to cards registered under A3 (H6, H7). H1–H5 and their results are unchanged.
+
+- **Development: 2018-01-01 → 2024-12-31.** The validation split (2023–2024) was spent by H5's Gate 2 (journal
+  #12), so it's in-sample from now on. A card whose data starts later says so and uses its own start date.
+- **Holdout: 2025-01-01 → 2026-09-30, unchanged.** Opened once, for at most one card, under a holdout file
+  registered first (A3 step 5).
+- **§2 is replaced** by the two points above. Gate 1′ ("pre-screen") runs on the development period.
+- **§7 is unchanged** and is judged on the development period at 2× costs. A3 step 3 adds the in-sample checks
+  from PROJECT_PLAN.md §5.4 steps 3–8; each card fixes their exact tests before it is run.
+- **§9's cap:** at most 2 new cards under A3, and at most one of them goes to the holdout.
+- Multiple testing: the trial count carries on from 67 (journal #12).
+- Everything else (data roles, execution model, costs, benchmarks, metrics, variant selection) is unchanged.

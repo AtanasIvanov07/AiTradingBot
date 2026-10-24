@@ -6,6 +6,7 @@
 > **Since then: learning-only path (amendment A1, below Phase 1).** It runs Phase 3's engineering and operations work in dry-run only, with no money and no claim of an edge.
 > **Then: amendment A2, back to the original plan.** H5 went to Phase 2 by exception, under rules registered first (`research/hypotheses/H5-gate2.md`).
 > **Result (20 Oct 2026): H5 killed at Gate 2.** On unseen 2023–2024 data it made 35.5% a year against buy & hold's 108.4%, and its timing beat only 37% of random strategies (journal #12). No candidate is left, so the Phase 2 kill rule says **stop**. The 2025–2026 holdout was never opened.
+> **Now (25 Oct 2026): amendment A3, registered.** Up to 2 genuinely new ideas, developed on 2018–2024, and one look at the holdout for at most one of them.
 
 > **Disclaimer.** This is not financial, tax or legal advice, and I am not a licensed adviser. It is a plan for a careful engineering and research experiment. It does not recommend any investment. Facts about exchanges, fees and tax change often. Section 12 lists what I could not fully verify.
 
@@ -689,6 +690,87 @@ H5 goes into **Phase 2** by exception, despite its Gate 1 miss: one criterion, t
   - Passed: drawdown, costs, robustness, walk-forward and Bitvavo.
   - The holdout stays closed. Phase 2's kill rule applies: no candidate is left, so **stop**, unless a new plan
     revision brings a genuinely new strategy idea.
+
+### Amendment A3 — One genuinely new idea, one look at the holdout (25 Oct 2026)
+
+Status: **REGISTERED 2026-10-25** (approved as written), before any test under it was run. Step 1's conventions
+amendment is in `research/hypotheses/_CONVENTIONS.md`.
+
+**Decision (yours, 25 Oct 2026):** reopen research for a genuinely new strategy idea, instead of stopping after H5.
+
+#### What data is still clean
+
+| Data | State | What it can still be used for |
+|---|---|---|
+| Development 2018–2022 | **Heavily mined.** 5 cards, 63 variants, all from one family (trend and volatility timing). | Development only |
+| Validation 2023–2024 | **Spent.** H5's results on it were computed and read (journal #12). We now also know trend timing beat only 37% of random runs there. | Development only. It's no longer out-of-sample for anything. |
+| Holdout 2025-01 → 2026-09 | **Clean.** No strategy result computed. One known leak: H5's trend was "on" for both coins in mid-October 2026, just after the holdout ends. | **The one remaining out-of-sample test, 638 days, opened once** |
+| Live data from Oct 2026 | Clean, forward only | Paper trading (Phase 3) |
+
+Caveat that applies to every split: you and I both know roughly how crypto prices moved in 2025–2026 from public
+news. So an idea must not be chosen *because* it would have done well in 2025–2026 (see the rules below).
+
+#### The fair test, step by step
+
+1. **Approve A3** (this text). Then add amendment 1 to `research/hypotheses/_CONVENTIONS.md`:
+   development = **2018-01-01 → 2024-12-31**, holdout unchanged. Every other convention (execution, costs,
+   benchmarks, metrics, variant selection, kill rules) stays as registered.
+2. **Register at most 2 new cards** (H6, H7) **before** running anything on them. Each card must:
+   - use a mechanism **outside H1–H5's family**: no in/out or sizing rule driven by price trend or realised
+     volatility of BTC/ETH;
+   - answer §2.1's question, *"who is on the other side, and why are they willing to lose?"*, from mechanism and
+     pre-2025 research, **not** from what happened in 2025–2026;
+   - have ≤ 3 parameters and ≤ 20 variants, with the grid fixed in the card;
+   - name its **null benchmark**: what "no skill" looks like for this idea (for a timing rule, §5.4's random-entry
+     test with the same exposure; for a rule that isn't timing, the card says what and why);
+   - list any new data it needs. New data gets the same ingest, validation and manifest as Phase 1, and its
+     holdout part is quality-checked only.
+3. **Gate 1′ on development 2018–2024**, at 2× costs, with conventions §7 unchanged. Using 2023–2024 here is
+   honest because it's in-sample now, and it adds a strong bull market to the 2018–2022 regimes.
+   - The selected variant must also pass §5.4 steps 3–8 on development: ±25% robustness, walk-forward windows,
+     cost stress, Monte Carlo, the card's null benchmark and the Binance cross-check. That's what Gate 2 would
+     have checked on validation, so it's done here instead, in-sample.
+   - **At most one card goes forward.** If both pass, the one with the higher plateau-median Calmar goes (decided
+     now, so it can't be chosen after looking).
+   - Neither passes → **final stop** (below). There's no H8.
+4. **Build it before opening anything:** the Freqtrade strategy, parity with the research engine on development,
+   and clean `lookahead-analysis` and `recursive-analysis`. A bug found after the holdout is opened can't be fixed
+   without spending the holdout, so the build is checked first.
+5. **Register the holdout test** (`research/hypotheses/H6-holdout.md` or H7) before opening it, in the same style
+   as `H5-gate2.md`:
+   - the same Gate 2 criteria from Phase 2 and §1.2, at modelled costs, against 50/50 buy & hold;
+   - walk-forward windows: 2025H1, 2025H2, 2026H1 and 2026Q3, profitable in ≥ 3 of 4;
+   - holdout drawdown no worse than the development Monte Carlo 95th percentile;
+   - the deflated Sharpe ratio counts **all** trials: 67 so far plus every new variant.
+6. **Open the holdout once.** Pass → step 7. Fail → **final stop.** No re-tuning, no second card, no second look.
+7. **Phase 3 paper trading** on live data, **at least 12 weeks** instead of 8, on a host that keeps running when
+   the Claude app closes (Task Scheduler or the Linux VM; journal #13's lesson). Signal parity must hold. Then
+   Phase 4 with the €100, with keys and the live switch done by you.
+
+#### What a pass would and wouldn't prove
+
+- 638 days is short. For a strategy with a Sharpe ratio around 1, the uncertainty on a 1.75-year Sharpe is about
+  ±0.9. So **a holdout pass can't prove an edge.** It only shows the idea didn't clearly fail on unseen data.
+  A clear fail, on the other hand, is a reliable kill.
+- That's why Phase 3 is longer, and why Phase 4 stays at €100 until live results agree with the backtest.
+- Slow rules will make few trades in 638 days. Fewer than 50 orders gets the **low confidence** label, which the
+  holdout registration must accept or reject in advance.
+
+#### Final stop
+
+If no new card passes Gate 1′, or the chosen card fails the holdout, the project **ends for good**: no clean
+historical data is left. Any later idea would have to be tested forward only, with at least 12 months of paper
+trading before any money, under a new plan. The "DCA instead, learning success" outcome applies.
+
+#### Effort (rough)
+
+- Cards: 2–4 h.
+- New data source, if the idea needs one: 6–10 h. A fresh clone has no `data/`, so the existing series need
+  re-downloading either way (`python -m aitradingbot.ingest all`, about an hour).
+- Gate 1′ runner changes and the in-sample checks: 6–10 h.
+- Freqtrade build and parity: 4–8 h.
+- Holdout registration and run: 2–3 h.
+- **Total about 20–35 h, so 2–3 weeks at 10–20 h a week**, then at least 12 weeks of paper trading.
 
 ### Phase 2 — Rigorous backtest (Weeks 6–9, ~40–60 h)
 
