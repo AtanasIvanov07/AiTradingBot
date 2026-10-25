@@ -27,7 +27,7 @@ freqtrade backtesting --config user_data/config.json --strategy SampleStrategy -
 ## Research data (Phase 1)
 
 ```powershell
-python -m aitradingbot.ingest all        # Binance (USDT), Kraken (EUR), Bitvavo (EUR): 1d, 4h, 1h
+python -m aitradingbot.ingest all        # Binance (USDT), Kraken (EUR), Bitvavo (EUR): 1d, 4h, 1h; funding rates
 python -m aitradingbot.validate --out research/reports/data-validation.md
 pytest                                   # includes tests/test_data_quality.py on the real data
 ```
@@ -37,9 +37,11 @@ pytest                                   # includes tests/test_data_quality.py o
 | Binance public data | BTC/USDT, ETH/USDT since Aug 2017 | Monthly zips from data.binance.vision, SHA-256 verified, cached in `data/raw/` |
 | Kraken OHLCVT | BTC/EUR, ETH/EUR long EUR history | Reads only the needed CSVs out of Kraken's ~10 GB archive via HTTP range requests (CRC-checked). `--zip` accepts local copies. |
 | Bitvavo API | BTC/EUR, ETH/EUR, the market the bot trades | Public candles endpoint, paged backwards; unclosed candles dropped |
+| Binance USD-M funding | BTCUSDT, ETHUSDT perpetual funding rates since Jan 2020 (H6 signal only, never traded) | Monthly zips from data.binance.vision, SHA-256 verified; `python -m aitradingbot.ingest funding` |
 
 Everything lands in `data/clean/<source>/<BASE>_<QUOTE>_<tf>.parquet` with a `.manifest.json` (inputs, checksums, row
-counts). Candles are labelled by **open time in UTC**. Splits are in `src/aitradingbot/splits.py`; the holdout
+counts). Candles are labelled by **open time in UTC**. Funding settlements go to
+`data/clean/binance_funding/<SYMBOL>.parquet`, labelled by settlement time in UTC. Splits are in `src/aitradingbot/splits.py`; the holdout
 (2025-01 → 2026-09) is downloaded and quality-checked, but strategy results on it are looked at once, at the end of Phase 2.
 
 ## Pre-screen (Phase 1, Gate 1)

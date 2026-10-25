@@ -1,7 +1,8 @@
 """Command line: python -m aitradingbot.validate [--out research/reports/data-validation.md]
 
 Validates every clean series under data/clean/, cross-checks pairs available from more than one
-source, prints a Markdown report and exits with status 1 if any series has errors.
+source, checks the funding-rate series (H6 signal), prints a Markdown report and exits with
+status 1 if any series has errors.
 """
 
 from __future__ import annotations
@@ -13,13 +14,17 @@ from pathlib import Path
 
 import pandas as pd
 
+from aitradingbot.ingest import funding
 from aitradingbot.ingest.common import Dataset, list_clean_datasets
 from aitradingbot.splits import RESEARCH_END, RESEARCH_START, WARMUP_START
 from aitradingbot.validate.checks import (
     DEFAULT_MAX_MISSING_FRACTION,
+    FundingReport,
     Report,
+    assess_from,
     cross_source,
     validate,
+    validate_funding,
 )
 
 MAX_LISTED = 5
@@ -31,6 +36,11 @@ CROSS_HEADER = [
     "Pair", "TF", "Sources", "Common candles", "Median diff", "p99 diff", "Max diff",
     "Share > tolerance",
 ]  # fmt: skip
+FUNDING_HEADER = [
+    "Symbol", "Settlements", "First", "Last", "Coverage", "Missing", "Extreme", "Max |rate|",
+    "Status",
+]  # fmt: skip
+FUNDING_START = pd.Timestamp(f"{funding.ARCHIVE_START}-01", tz="UTC")
 
 
 def table_row(cells: list[object]) -> str:
@@ -49,7 +59,7 @@ def fmt_time(value: pd.Timestamp | None, timeframe: str) -> str:
     return f"{value:%Y-%m-%d}" if timeframe == "1d" else f"{value:%Y-%m-%d %H:%M}"
 
 
-def status_label(report: Report) -> str:
+def status_label(report: Report | FundingReport) -> str:
     if not report.ok:
         return "❌ error"
     return "⚠️ warn" if report.warnings else "✅ ok"
@@ -71,8 +81,9 @@ def build_report(
         f"Generated {pd.Timestamp.now(tz='UTC'):%Y-%m-%d %H:%M} UTC. "
         f"Research period: {RESEARCH_START:%Y-%m-%d} → {RESEARCH_END:%Y-%m-%d}. "
         f"Gaps, outliers and zero-volume candles are assessed from {WARMUP_START:%Y-%m-%d} "
-        f"(warm-up start); a series errors if more than {max_missing_fraction:.1%} of candles "
-        "are missing. Timestamps are candle open times, UTC.",
+        f"(warm-up start), Bitvavo's from {assess_from('bitvavo'):%Y-%m-%d}; a series errors if "
+        f"more than {max_missing_fraction:.1%} of candles are missing. Timestamps are candle open "
+        "times, UTC.",
         "",
     ]
     if not datasets:
@@ -84,7 +95,10 @@ def build_report(
     for dataset in datasets:
         frames[dataset] = dataset.load(root)
         reports[dataset] = validate(
-            frames[dataset], dataset.timeframe, max_missing_fraction, assess_from=WARMUP_START
+            frames[dataset],
+            dataset.timeframe,
+            max_missing_fraction,
+            assess_from=assess_from(dataset.source),
         )
 
     lines += ["## Summary", "", *table_head(SUMMARY_HEADER, numeric_from=3)]
@@ -177,9 +191,52 @@ def build_report(
         lines += ["", "Largest disagreements (worth a look; often one venue dislocating):", ""]
         lines += disagreements
 
-    all_ok = all(report.ok for report in reports.values())
+    funding_reports = {
+        symbol: validate_funding(funding.load(symbol, root), max_missing_fraction)
+        for symbol in funding.list_symbols(root)
+    }
+    lines += funding_section(funding_reports)
+
+    all_ok = all(r.ok for r in reports.values()) and all(r.ok for r in funding_reports.values())
     lines += ["", f"**Overall: {'no errors' if all_ok else 'ERRORS FOUND'}**", ""]
     return "\n".join(lines), all_ok
+
+
+def funding_section(reports: dict[str, FundingReport]) -> list[str]:
+    lines = [
+        "",
+        "## Funding rates (H6 signal)",
+        "",
+        f"Binance USD-M perpetual settlements. Coverage is checked from {FUNDING_START:%Y-%m-%d} "
+        f"(archive start) to {RESEARCH_END:%Y-%m-%d}. Rates are per settlement.",
+        "",
+    ]
+    if not reports:
+        lines.append("No funding series found. Run `python -m aitradingbot.ingest funding`.")
+        return lines
+    lines += table_head(FUNDING_HEADER, numeric_from=1)
+    for symbol, report in reports.items():
+        covered = report.covers(FUNDING_START, RESEARCH_END)
+        lines.append(
+            table_row(
+                [
+                    symbol,
+                    f"{report.rows:,}",
+                    fmt_time(report.first, "1h"),
+                    fmt_time(report.last, "1h"),
+                    "full" if covered else "partial",
+                    f"{report.missing:,} ({report.missing_fraction:.3%})",
+                    report.extreme,
+                    f"{report.max_abs_rate:.4%}",
+                    status_label(report),
+                ]
+            )
+        )
+    for symbol, report in reports.items():
+        if report.findings:
+            lines += ["", f"**{symbol}**"]
+            lines += [f"- {f.severity}: {f.message}" for f in report.findings]
+    return lines
 
 
 def main(argv: list[str] | None = None) -> int:

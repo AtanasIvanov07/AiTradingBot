@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from aitradingbot.ingest.common import OHLCV_COLUMNS, OPEN_JUMP_LIMITS, TIMEFRAMES, bad_opens
+from aitradingbot.splits import WARMUP_START
 
 ERROR = "error"
 WARNING = "warning"
@@ -19,6 +20,16 @@ WARNING = "warning"
 # A candle moving more than this (close-to-close, or a wick beyond the body) is flagged for review.
 OUTLIER_THRESHOLDS = {"1h": 0.10, "4h": 0.15, "1d": 0.25}
 DEFAULT_MAX_MISSING_FRACTION = 0.01
+
+# Where gap, outlier and zero-volume checks start, per source (default: the research warm-up start).
+# Bitvavo listed BTC/EUR and ETH/EUR in March 2019 and ETH/EUR traded thinly that year: 8.5% of its
+# hours had no trade, so no 1h candle. Like Kraken's thin 2013-2015 years, those early gaps are
+# reported as a warning but don't fail the series. Bitvavo is a confirmation source at 1d only.
+ASSESS_FROM = {"bitvavo": pd.Timestamp("2020-01-01", tz="UTC")}
+
+
+def assess_from(source: str) -> pd.Timestamp:
+    return ASSESS_FROM.get(source, WARMUP_START)
 
 
 @dataclass(frozen=True)
@@ -246,4 +257,107 @@ def cross_source(a: pd.DataFrame, b: pd.DataFrame, tolerance: float = 0.005) -> 
         max_diff=float(diff.max()),
         share_over_tolerance=float((diff > tolerance).mean()),
         worst=merged.nlargest(5, "rel_diff").reset_index(drop=True),
+    )
+
+
+# Funding rates (H6 signal, src/aitradingbot/ingest/funding.py). A settlement beyond this, in either
+# direction, is flagged for review: at 8-hourly settlements it's about 330% a year.
+FUNDING_EXTREME_RATE = 0.003
+FUNDING_INTERVALS = {1.0, 2.0, 4.0, 8.0}
+FUNDING_COLUMNS = ["funding_time", "interval_hours", "rate"]
+
+
+@dataclass
+class FundingReport:
+    rows: int
+    first: pd.Timestamp | None
+    last: pd.Timestamp | None
+    missing: int
+    missing_fraction: float
+    extreme: int
+    max_abs_rate: float
+    findings: list[Finding] = field(default_factory=list)
+
+    @property
+    def errors(self) -> list[Finding]:
+        return [f for f in self.findings if f.severity == ERROR]
+
+    @property
+    def warnings(self) -> list[Finding]:
+        return [f for f in self.findings if f.severity == WARNING]
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+    def covers(self, start: pd.Timestamp, end: pd.Timestamp) -> bool:
+        """True if settlements run from ``start`` through the last 8-hourly one of day ``end``."""
+        if self.first is None or self.last is None:
+            return False
+        return self.first <= start and self.last >= end + pd.Timedelta(hours=16)
+
+
+def missing_settlements(frame: pd.DataFrame) -> int:
+    """Settlements missing between consecutive rows, given each row's funding interval.
+
+    Across an interval change (e.g. 8h → 4h) the longer of the two intervals is the expected step,
+    so the switch itself isn't counted as a gap.
+    """
+    hours = frame["funding_time"].diff().dt.total_seconds() / 3600
+    step = pd.concat([frame["interval_hours"], frame["interval_hours"].shift(1)], axis=1).max(
+        axis=1
+    )
+    missing = (hours // step - 1).where(hours > step, 0)
+    return int(missing.fillna(0).sum())
+
+
+def validate_funding(
+    frame: pd.DataFrame, max_missing_fraction: float = DEFAULT_MAX_MISSING_FRACTION
+) -> FundingReport:
+    """Check one symbol's funding settlements: structure, alignment, gaps and extreme rates."""
+    findings: list[Finding] = []
+
+    def error(check: str, message: str) -> None:
+        findings.append(Finding(check, ERROR, message))
+
+    def warning(check: str, message: str) -> None:
+        findings.append(Finding(check, WARNING, message))
+
+    if frame.empty:
+        error("empty", "no rows")
+        return FundingReport(0, None, None, 0, 0.0, 0, 0.0, findings)
+
+    if (count := int(frame[FUNDING_COLUMNS].isna().any(axis=1).sum())) > 0:
+        error("nan", f"{count} rows with missing values")
+    if (count := int(frame["funding_time"].duplicated().sum())) > 0:
+        error("duplicates", f"{count} duplicate funding_time values")
+    if not frame["funding_time"].is_monotonic_increasing:
+        error("order", "funding_time is not increasing")
+    if (count := int((~frame["interval_hours"].dropna().isin(FUNDING_INTERVALS)).sum())) > 0:
+        error("interval", f"{count} settlements with an unknown funding interval")
+    times = frame["funding_time"]
+    off_grid = (times.dt.floor("1h") != times) | (times.dt.hour % frame["interval_hours"] != 0)
+    if (count := int(off_grid.sum())) > 0:
+        error("alignment", f"{count} settlements not on their interval's UTC grid")
+
+    missing = missing_settlements(frame)
+    fraction = missing / (len(frame) + missing)
+    if fraction > max_missing_fraction:
+        error("gaps", f"{missing} missing settlements ({fraction:.2%})")
+    elif missing:
+        warning("gaps", f"{missing} missing settlements ({fraction:.3%})")
+
+    extreme = int((frame["rate"].abs() > FUNDING_EXTREME_RATE).sum())
+    if extreme:
+        warning("extreme", f"{extreme} settlements beyond ±{FUNDING_EXTREME_RATE:.1%}")
+
+    return FundingReport(
+        rows=len(frame),
+        first=times.min(),
+        last=times.max(),
+        missing=missing,
+        missing_fraction=fraction,
+        extreme=extreme,
+        max_abs_rate=float(frame["rate"].abs().max()),
+        findings=findings,
     )

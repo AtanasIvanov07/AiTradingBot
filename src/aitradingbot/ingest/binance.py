@@ -69,19 +69,23 @@ def raw_path(root: Path, symbol: str, interval: str, month: str) -> Path:
 def download_month(
     symbol: str, interval: str, month: str, root: Path, get: HttpGet = http_get
 ) -> Path | None:
-    """Download and checksum-verify one monthly zip. Returns None if Binance has no file for it.
+    """Download and checksum-verify one monthly zip. Returns None if Binance has no file for it."""
+    url = f"{BASE_URL}/{symbol}/{interval}/{archive_name(symbol, interval, month)}"
+    return download_verified(url, raw_path(root, symbol, interval, month), get)
 
-    Raw files are immutable: an existing zip is re-verified against its saved checksum, not
-    re-downloaded.
+
+def download_verified(url: str, path: Path, get: HttpGet = http_get) -> Path | None:
+    """Download ``url`` to ``path`` and check it against Binance's ``.CHECKSUM`` file.
+
+    Returns None if Binance has no file at ``url``. Raw files are immutable: an existing zip is
+    re-verified against its saved checksum, not re-downloaded.
     """
-    path = raw_path(root, symbol, interval, month)
     checksum_path = path.with_name(path.name + ".CHECKSUM")
     if path.exists() and checksum_path.exists():
         expected = checksum_path.read_text(encoding="utf-8").split()[0]
         if sha256_file(path) != expected:
             raise ValueError(f"local file corrupted (checksum mismatch): {path}")
         return path
-    url = f"{BASE_URL}/{symbol}/{interval}/{archive_name(symbol, interval, month)}"
     try:
         archive = get(url)
     except FileNotFoundError:

@@ -107,3 +107,8 @@ Applies to cards registered under A3 (H6, H7). H1–H5 and their results are unc
 - **§9's cap:** at most 2 new cards under A3, and at most one of them goes to the holdout.
 - Multiple testing: the trial count carries on from 67 (journal #12).
 - Everything else (data roles, execution model, costs, benchmarks, metrics, variant selection) is unchanged.
+
+### Amendment 2 — Erratum: Bitvavo's 2022-11-09 candle (2026-10-25)
+
+§1's note about "the missing candle on 2022-11-09" is wrong. That candle was dropped by a paging bug in our Bitvavo
+ingest, not missing at the exchange (journal #14). Bitvavo 1d data has no gaps. No rule changes.

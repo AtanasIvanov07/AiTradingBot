@@ -19,6 +19,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 11 | 2026-10-20 | H5 (learning path, A1) | Dry-run `H5TrendVol` + watchdog, parity tool, fire drills | Live Bitvavo data from 2026-10-20 (paper, €100) | Bitvavo fee 0.25% (dry-run) | Bot running on the PC; 2 paper positions; drills D1–D5 passed (1.3–7 s) | **8-week Gate 3 operations clock started.** Operations only; no strategy result. |
 | 12 | 2026-10-20 | H5 Gate 2 (exception, amendment A2) | Fixed H5 + 4 ±25% variants, 1,000 random-entry runs | Kraken BTC/ETH-EUR 1d, **validation 2023–2024** (first look); + Bitvavo, Binance | 0.30%/side (G3 and G7 at 0.60%) | 35.5% CAGR, −20.4% DD, Sharpe 1.30, Calmar 1.74 vs 50/50 B&H 108.4%, −34.8%, 1.76, 3.11 | **KILL**: G1 (Calmar 1.74 < 3.74) and G5 (beats only 37% of random runs). G2, G3, G4, G6, G7 pass. **Holdout stays closed.** Variants: 67. |
 | 13 | 2026-10-20 | H5 dry-run (A1) | Paper bot + watchdog stopped for good | — | — | Ran 18:55 → about 20:35 UTC (about 1.7 h); 2 paper positions left open in the dry-run DB | **Stopped**, per your decision after the Gate 2 kill. Both had already died around 20:35 UTC (see notes). The 8-week clock is void. |
+| 14 | 2026-10-25 | — (data, amendment A3) | Funding-rate ingest for H6; two Bitvavo paging bugs fixed | Binance USD-M funding BTCUSDT, ETHUSDT 2020-01 → 2026-09; all candle series re-downloaded (fresh clone) | — | 7,395 settlements per symbol, 0 missing, all 8-hourly; ETH 5 settlements beyond ±0.3% (warning). All 20 series pass validation | Data only: no strategy result computed. **The "missing" Bitvavo 2022-11-09 candle was an ingest bug** (see notes). Variants: still 67. |
 
 ## Notes
 
@@ -38,7 +39,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 - Data quirks found and handled:
   - **Binance, 9–11 Feb 2018:** after its outage, 43 hourly candles open at :28:14.789 instead of on the hour. They're **dropped** (recorded in the manifest), leaving a visible gap. Snapping them onto the hour would mislabel the period they cover.
   - **Kraken, 11–12 Jan 2018:** a 37-hour gap in 1h data (exchange outage). Kraken's 2013–2015 EUR markets have many no-trade gaps, so gaps are judged only from the Aug 2017 warm-up start (0.1% missing since then).
-  - **Bitvavo:** a missing daily candle on 9 Nov 2022 for both pairs, during the FTX crash. Remember this when confirming results on Bitvavo data.
+  - **Bitvavo:** a missing daily candle on 9 Nov 2022 for both pairs, during the FTX crash. Remember this when confirming results on Bitvavo data. *Corrected in #14: an ingest paging bug, not an exchange gap.*
   - **Kraken archives:** the full archive and the 2026Q3 zip agree on every overlapping candle (0 conflicts). Kraken's support page saying the archive ends "30 June 2026" is out of date.
 - Cross-source (Bitvavo vs Kraken, EUR):
   - Median close difference is about 0.04%, so the sources agree well.
@@ -265,7 +266,8 @@ tests matters: the more variants you try, the more likely the best one is luck (
     - 3 resizes that sit right at the 10-point threshold.
 - **Bitvavo check (2020-04-11 → 2022):** Freqtrade needs 400 startup candles, so it can only start there.
   - Orders are again almost identical (BTC 34/36, ETH 32/33).
-  - But final equity differs (2.53× vs 2.26×). The whole gap is **one missing candle on 2022-11-09**, the FTX crash
+  - But final equity differs (2.53× vs 2.26×). *(#14: that candle was dropped by our ingest, not missing at Bitvavo; the
+    lesson about Freqtrade filling gaps still holds.)* The whole gap is **one missing candle on 2022-11-09**, the FTX crash
     day.
     - Freqtrade fills it at the previous close and "sells" both sleeves at the pre-crash price, a fill that couldn't
       have happened.
@@ -403,3 +405,39 @@ tests matters: the more variants you try, the more likely the best one is luck (
   0.01976624 @ 2,167.72). No real money and no exchange keys were involved.
   - The DB, logs and backups stay on disk; they're gitignored.
   - The 8-week Gate 3 clock is void.
+
+### #14 — Funding-rate data for H6, and two Bitvavo ingest bugs
+- Context: amendment A3 step 2. H6 was registered (commit `c213ae5`) before any funding data was downloaded.
+- Commands: `python -m aitradingbot.ingest all --end 2026-09-30` (the fresh clone had no `data/`), then
+  `python -m aitradingbot.validate --out research/reports/data-validation.md`, then `pytest` (180 passed).
+- **Funding rates** (new: `python -m aitradingbot.ingest funding`, `src/aitradingbot/ingest/funding.py`):
+  - Binance USD-M monthly archives, SHA-256 verified, stored in `data/clean/binance_funding/<SYMBOL>.parquet` with a
+    manifest. Settlement times are rounded to the hour (the archive's are a few ms late); one more than 5 minutes
+    off would be kept as-is and fail validation.
+  - BTCUSDT and ETHUSDT: 7,395 settlements each, 2020-01-01 00:00 → 2026-09-30 16:00. That's exactly 3 a day:
+    **0 missing**, all on the 8-hour grid, no interval changes.
+  - Extreme settlements (beyond ±0.3%): BTC 0 (max 0.300%), ETH 5 (max 0.375%). A warning, not an error.
+  - Only these quality statistics were looked at, as in #1. No funding value was compared with returns.
+- **Bitvavo bug 1: one candle lost per page.** Bitvavo's `end` keeps candles whose *close* is at or before it
+  (checked on the live API). The pager ended each next page 1 ms before the oldest open received, so the candle
+  just before every 1,440-candle page boundary was skipped.
+  - **The "missing" 2022-11-09 daily candle (#1, #10, conventions §1) was one of these**, not an exchange gap.
+    Its date was just the run date minus 1,440 days. Bitvavo 1d is now complete (0 gaps).
+  - 4h gaps fell from 12 to 1 (BTC) and from 25 to 14 (ETH); BTC 1h gaps from 163 to 118.
+- **Bitvavo bug 2: paging stopped at the first short page.** Each call only searches the 1,440 intervals before
+  `end`, so a short page means gaps in that window, not the listing. ETH/EUR 1h was cut at a different late-2019
+  date on every run. It now goes back to the 2019-03-08 listing.
+  - Recovered 2019 ETH/EUR hours are thin: 8.5% have no trade, so no candle. That pushed the series to 1.12%
+    missing. **Bitvavo gaps are now judged from 2020-01-01** (0.225% for ETH 1h), the same treatment as Kraken's
+    thin 2013–2015 years. Earlier gaps are still reported as a warning (`validate/checks.py: ASSESS_FROM`).
+- Also: `--end` for Bitvavo is now an inclusive day, so `--end 2026-09-30` keeps that day's candles.
+- **Impact on past decisions: none.**
+  - Gate 1 (H1–H5) judged on Kraken; Bitvavo numbers in the `prescreen-H*.md` reports were informational and
+    include the artificial 2022-11-09 gap. Not re-run.
+  - H5's G7 (Bitvavo 2023–2024) had no artificial gap: the next page boundary before 2022-11-09 fell before
+    Bitvavo's listing. The decision stands either way (H5 failed G1 and G5).
+  - #10's Bitvavo parity gap (2.53× vs 2.26×) came from the artificial gap. The lesson (Freqtrade fills missing
+    candles at the previous close) stays valid.
+  - Ops are unaffected: the parity tool and the dry-run get Bitvavo data through Freqtrade, not this module.
+- Tests: the fake Bitvavo API now applies the real filters and window, and three new tests fail on the old pager.
+- Variants: still 67. No strategy was run.

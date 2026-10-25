@@ -12,14 +12,20 @@ DAY_MS = 86_400_000
 START_MS = 1_704_067_200_000  # 2024-01-01
 
 
+INTERVAL_MS = {"1h": 3_600_000, "4h": 14_400_000, "1d": DAY_MS}
+
+
 def fake_api(candle_times: list[int], page_size: int) -> Callable[[str], bytes]:
-    """Serve newest-first pages like Bitvavo, honouring start/end/limit."""
+    """Serve newest-first pages like Bitvavo: ``start`` filters on open time, ``end`` on close,
+    and only the ``limit`` intervals before ``end`` are searched."""
 
     def get(url: str) -> bytes:
         query = parse_qs(urlparse(url).query)
         start, end = int(query["start"][0]), int(query["end"][0])
+        step = INTERVAL_MS[query["interval"][0]]
         limit = min(int(query["limit"][0]), page_size)
-        hits = sorted((t for t in candle_times if start <= t <= end), reverse=True)[:limit]
+        first = max(start, end - limit * step)
+        hits = sorted((t for t in candle_times if t >= first and t + step <= end), reverse=True)
         # open == previous close, as in a continuous 24/7 market
         return json.dumps([[t, "1.5", "2", "1", "1.5", "10"] for t in hits]).encode()
 
@@ -29,10 +35,37 @@ def fake_api(candle_times: list[int], page_size: int) -> Callable[[str], bytes]:
 def test_pages_backwards_until_listing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bitvavo, "MAX_LIMIT", 3)
     times = [START_MS + i * DAY_MS for i in range(8)]
+    end = times[-1] + DAY_MS  # the close of the newest candle
     rows = bitvavo.fetch_candles(
-        "BTC-EUR", "1d", START_MS - 30 * DAY_MS, times[-1], fake_api(times, 3), pause=0
+        "BTC-EUR", "1d", START_MS - 30 * DAY_MS, end, fake_api(times, 3), pause=0
     )
-    assert sorted(int(r[0]) for r in rows) == times
+    got = [int(r[0]) for r in rows]
+    assert sorted(got) == times  # nothing lost at the page boundaries
+    assert len(got) == len(set(got))  # and nothing fetched twice
+
+
+def test_pages_past_gaps_and_empty_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(bitvavo, "MAX_LIMIT", 3)
+    listed = [START_MS + i * DAY_MS for i in range(20)]
+    # A 1-day gap (short page) and a 5-day outage (a whole empty window) inside the history.
+    times = [t for i, t in enumerate(listed) if i != 15 and not 5 <= i < 10]
+    end = times[-1] + DAY_MS
+    rows = bitvavo.fetch_candles(
+        "BTC-EUR", "1d", START_MS - 30 * DAY_MS, end, fake_api(times, 3), pause=0
+    )
+    got = [int(r[0]) for r in rows]
+    assert sorted(got) == times
+    assert len(got) == len(set(got))
+
+
+def test_end_day_is_inclusive(tmp_path: Path) -> None:
+    times = [START_MS + i * DAY_MS for i in range(10)]  # 2024-01-01 .. 2024-01-10
+    (path,) = bitvavo.ingest(
+        ["BTC-EUR"], ["1d"], "2024-01-01", "2024-01-05", tmp_path, fake_api(times, 1440)
+    )
+    frame = pd.read_parquet(path)
+    assert frame["open_time"].min() == pd.Timestamp("2024-01-01", tz="UTC")
+    assert frame["open_time"].max() == pd.Timestamp("2024-01-05", tz="UTC")
 
 
 def test_error_payload_raises() -> None:

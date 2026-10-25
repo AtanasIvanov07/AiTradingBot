@@ -1,9 +1,10 @@
-"""Command line: python -m aitradingbot.ingest {binance,kraken,bitvavo,all} [options]
+"""Command line: python -m aitradingbot.ingest {binance,kraken,bitvavo,funding,all} [options]
 
 Examples:
     python -m aitradingbot.ingest all
     python -m aitradingbot.ingest binance --symbols BTCUSDT ETHUSDT --timeframes 1d
     python -m aitradingbot.ingest kraken --zip D:/downloads/Kraken_OHLCVT_Full.zip
+    python -m aitradingbot.ingest funding
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from aitradingbot.ingest import binance, bitvavo, kraken
+from aitradingbot.ingest import binance, bitvavo, funding, kraken
 from aitradingbot.ingest.common import TIMEFRAMES
 
 DEFAULT_TIMEFRAMES = ["1d", "4h", "1h"]
@@ -36,8 +37,13 @@ def run_bitvavo(args: argparse.Namespace) -> None:
     bitvavo.ingest(args.markets, args.timeframes, args.start, args.end)
 
 
+def run_funding(args: argparse.Namespace) -> None:
+    end = args.end or binance.last_complete_month()
+    funding.ingest(args.funding_symbols, args.start[:7], end[:7])
+
+
 def run_all(args: argparse.Namespace) -> None:
-    for runner in (run_binance, run_kraken, run_bitvavo):
+    for runner in (run_binance, run_kraken, run_bitvavo, run_funding):
         runner(args)
 
 
@@ -74,13 +80,20 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--markets", nargs="+", default=["BTC-EUR", "ETH-EUR"])
     v.set_defaults(run=run_bitvavo)
 
-    a = sub.add_parser("all", parents=[common], help="all three sources with default pairs")
+    f = sub.add_parser(
+        "funding", parents=[common], help="Binance USD-M perpetual funding rates (H6 signal)"
+    )
+    f.add_argument("--symbols", dest="funding_symbols", nargs="+", default=["BTCUSDT", "ETHUSDT"])
+    f.set_defaults(run=run_funding)
+
+    a = sub.add_parser("all", parents=[common], help="all sources with default pairs")
     a.set_defaults(
         run=run_all,
         symbols=["BTCUSDT", "ETHUSDT"],
         pairs=list(kraken.KRAKEN_NAMES),
         zip=None,
         markets=["BTC-EUR", "ETH-EUR"],
+        funding_symbols=["BTCUSDT", "ETHUSDT"],
     )
     return parser
 
