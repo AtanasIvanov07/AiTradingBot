@@ -12,6 +12,7 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
         args: [--fix=lf]
+        exclude: '\.(ps1|bat|cmd)$'  # CRLF on purpose (.gitattributes)
       - id: detect-private-key
       - id: check-added-large-files
         args: [--maxkb=1000]
