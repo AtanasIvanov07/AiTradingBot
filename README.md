@@ -3,6 +3,9 @@
 A rule-based spot crypto trading experiment (BTC/EUR, ETH/EUR) built on [Freqtrade](https://www.freqtrade.io/).
 **[PROJECT_PLAN.md](PROJECT_PLAN.md)** covers the goals, risk rules, phase gates and timeline.
 
+> **Status: closed (25 Oct 2026).** Six pre-registered strategy ideas were tested and none passed, so nothing ever
+> traded. See **[research/reports/final-summary.md](research/reports/final-summary.md)**.
+
 > Dry-run only until Phase 4's gate is passed. `tests/test_repo.py` fails if `user_data/config.json` leaves dry-run.
 
 ## Quick start (Windows, PowerShell)

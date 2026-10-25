@@ -21,6 +21,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 13 | 2026-10-20 | H5 dry-run (A1) | Paper bot + watchdog stopped for good | — | — | Ran 18:55 → about 20:35 UTC (about 1.7 h); 2 paper positions left open in the dry-run DB | **Stopped**, per your decision after the Gate 2 kill. Both had already died around 20:35 UTC (see notes). The 8-week clock is void. |
 | 14 | 2026-10-25 | — (data, amendment A3) | Funding-rate ingest for H6; two Bitvavo paging bugs fixed | Binance USD-M funding BTCUSDT, ETHUSDT 2020-01 → 2026-09; all candle series re-downloaded (fresh clone) | — | 7,395 settlements per symbol, 0 missing, all 8-hourly; ETH 5 settlements beyond ±0.3% (warning). All 20 series pass validation | Data only: no strategy result computed. **The "missing" Bitvavo 2022-11-09 candle was an ingest bug** (see notes). Variants: still 67. |
 | 15 | 2026-10-25 | H6 (amendment A3) | Funding crowding filter, 18-variant grid; selected L=14, θ=35%, x=0.5; + 4 R1 variants, 1,000 random-crowded runs | Kraken BTC/ETH-EUR 1d, dev 2020-02-01 → 2024-12-31 (+ Binance, Bitvavo) | 0.60%/side | 38.3% CAGR, −44.5% DD, Sharpe 1.20, Calmar 0.86 vs 50/50 B&H 73.8%, −75.4%, 1.12, 0.98 | **KILL**: criteria 1 and 2 (portfolio, BTC, ETH), 4 (ETH), plateau, R5 (beats only 35% of random runs). R1, R2, R6 pass. Variants: 89. |
+| 16 | 2026-10-25 | — (project closed) | No H7 registered | — | — | — | **Closed for good** under A3's final stop (your decision). Six cards, 89 variants, none passed; nothing traded. Holdout never opened. Summary: `research/reports/final-summary.md`. |
 
 ## Notes
 
@@ -488,3 +489,13 @@ tests matters: the more variants you try, the more likely the best one is luck (
 - **Consequence (A3 step 3):** H6 is killed; it doesn't go to the holdout, which stays closed. A3 allows **one more
   card (H7)**. If none is registered, or H7 fails too, A3's final stop applies.
 - Variants: 67 + 22 = **89**.
+
+### #16 — Project closed
+- Decision (yours, 2026-10-25): don't register H7. A3's final stop applies, so the project is closed for good.
+- Considered for H7 and not registered: a macro liquidity filter (US real yields or the dollar index), buying after
+  forced-selling days, and the Coinbase premium. Judged odds of passing both Gate 1′ and the holdout were about 5%
+  at best, and the macro idea was partly attractive because of hindsight about 2022.
+- Final tally: 6 cards (H1–H6), 89 variants, no pass. No real money, no exchange key.
+- **The 2025-01 → 2026-09 holdout was never opened.** A3's final-stop text assumed it would have been used; it
+  wasn't. Any later idea still needs a new plan.
+- Closing summary: `research/reports/final-summary.md`.
