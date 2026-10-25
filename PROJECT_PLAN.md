@@ -6,7 +6,7 @@
 > **Since then: learning-only path (amendment A1, below Phase 1).** It runs Phase 3's engineering and operations work in dry-run only, with no money and no claim of an edge.
 > **Then: amendment A2, back to the original plan.** H5 went to Phase 2 by exception, under rules registered first (`research/hypotheses/H5-gate2.md`).
 > **Result (20 Oct 2026): H5 killed at Gate 2.** On unseen 2023–2024 data it made 35.5% a year against buy & hold's 108.4%, and its timing beat only 37% of random strategies (journal #12). No candidate is left, so the Phase 2 kill rule says **stop**. The 2025–2026 holdout was never opened.
-> **Now (25 Oct 2026): amendment A3, registered.** Up to 2 genuinely new ideas, developed on 2018–2024, and one look at the holdout for at most one of them. **H6** (funding-rate crowding filter) registered 25 Oct 2026; not run yet.
+> **Now (25 Oct 2026): amendment A3, registered.** Up to 2 genuinely new ideas, developed on 2018–2024, and one look at the holdout for at most one of them. **H6** (funding-rate crowding filter) **killed at Gate 1′** on 25 Oct 2026 (journal #15): its timing beat only 35% of random runs, and drawdown was 44.5%. The holdout stays closed. One card (H7) is left under A3.
 
 > **Disclaimer.** This is not financial, tax or legal advice, and I am not a licensed adviser. It is a plan for a careful engineering and research experiment. It does not recommend any investment. Facts about exchanges, fees and tax change often. Section 12 lists what I could not fully verify.
 
@@ -755,6 +755,12 @@ news. So an idea must not be chosen *because* it would have done well in 2025–
 - That's why Phase 3 is longer, and why Phase 4 stays at €100 until live results agree with the backtest.
 - Slow rules will make few trades in 638 days. Fewer than 50 orders gets the **low confidence** label, which the
   holdout registration must accept or reject in advance.
+
+#### Outcome so far
+
+- **H6 killed at Gate 1′, 25 Oct 2026** (journal #15, `research/reports/gate1-H6.md`). Calmar 0.86 vs 1.17 needed,
+  drawdown 44.5% vs 40%, and it beat only 35% of random-crowded runs. The holdout stays closed.
+- **One card left (H7).** If it isn't registered, or it fails Gate 1′, the final stop below applies.
 
 #### Final stop
 

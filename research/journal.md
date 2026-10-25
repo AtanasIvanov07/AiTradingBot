@@ -20,6 +20,7 @@ tests matters: the more variants you try, the more likely the best one is luck (
 | 12 | 2026-10-20 | H5 Gate 2 (exception, amendment A2) | Fixed H5 + 4 ±25% variants, 1,000 random-entry runs | Kraken BTC/ETH-EUR 1d, **validation 2023–2024** (first look); + Bitvavo, Binance | 0.30%/side (G3 and G7 at 0.60%) | 35.5% CAGR, −20.4% DD, Sharpe 1.30, Calmar 1.74 vs 50/50 B&H 108.4%, −34.8%, 1.76, 3.11 | **KILL**: G1 (Calmar 1.74 < 3.74) and G5 (beats only 37% of random runs). G2, G3, G4, G6, G7 pass. **Holdout stays closed.** Variants: 67. |
 | 13 | 2026-10-20 | H5 dry-run (A1) | Paper bot + watchdog stopped for good | — | — | Ran 18:55 → about 20:35 UTC (about 1.7 h); 2 paper positions left open in the dry-run DB | **Stopped**, per your decision after the Gate 2 kill. Both had already died around 20:35 UTC (see notes). The 8-week clock is void. |
 | 14 | 2026-10-25 | — (data, amendment A3) | Funding-rate ingest for H6; two Bitvavo paging bugs fixed | Binance USD-M funding BTCUSDT, ETHUSDT 2020-01 → 2026-09; all candle series re-downloaded (fresh clone) | — | 7,395 settlements per symbol, 0 missing, all 8-hourly; ETH 5 settlements beyond ±0.3% (warning). All 20 series pass validation | Data only: no strategy result computed. **The "missing" Bitvavo 2022-11-09 candle was an ingest bug** (see notes). Variants: still 67. |
+| 15 | 2026-10-25 | H6 (amendment A3) | Funding crowding filter, 18-variant grid; selected L=14, θ=35%, x=0.5; + 4 R1 variants, 1,000 random-crowded runs | Kraken BTC/ETH-EUR 1d, dev 2020-02-01 → 2024-12-31 (+ Binance, Bitvavo) | 0.60%/side | 38.3% CAGR, −44.5% DD, Sharpe 1.20, Calmar 0.86 vs 50/50 B&H 73.8%, −75.4%, 1.12, 0.98 | **KILL**: criteria 1 and 2 (portfolio, BTC, ETH), 4 (ETH), plateau, R5 (beats only 35% of random runs). R1, R2, R6 pass. Variants: 89. |
 
 ## Notes
 
@@ -441,3 +442,49 @@ tests matters: the more variants you try, the more likely the best one is luck (
   - Ops are unaffected: the parity tool and the dry-run get Bitvavo data through Freqtrade, not this module.
 - Tests: the fake Bitvavo API now applies the real filters and window, and three new tests fail on the old pager.
 - Variants: still 67. No strategy was run.
+
+### #15 — H6 Gate 1′ (amendment A3)
+- Command: `python -m aitradingbot.analysis.h6 --out research/reports/gate1-H6.md`, run on committed code `5802972`
+  with a clean tree (124 s). Report: `research/reports/gate1-H6.md`.
+- Rules: [H6.md](hypotheses/H6.md) and its amendment 1 (10-point rebalance band, R2/R5 at 2×, R4 at 1×), registered
+  before this run. **First time H6's rule touched real data.** Prices and funding cut at 2024-12-31; the holdout
+  wasn't loaded.
+- **Decision: KILL at Gate 1′.** No re-tuning (conventions §9).
+- Selected by §8: **L=14, θ=35%, x=0.5** (plateau-median score 0.83). The next best were 0.82 (L=14 at θ=20% and
+  50%, x=0.5): a flat ridge, not a spike.
+
+  | 2× costs, 2020-02 → 2024-12 | CAGR | Max DD | Sharpe | Calmar |
+  |---|---:|---:|---:|---:|
+  | H6 selected | 38.3% | −44.5% | 1.20 | 0.86 |
+  | 50/50 buy & hold | 73.8% | −75.4% | 1.12 | 0.98 |
+
+- **Failed:**
+  - Criterion 1, Calmar ≥ 1.2× buy & hold: portfolio 0.86 vs 1.17 needed; BTC 0.87 vs 1.01; ETH 0.79 vs 1.30.
+  - Criterion 2, drawdown ≤ 40%: portfolio 44.5%, BTC 43.9%, ETH 48.2%. Across the grid, only the three θ=20%,
+    x=0 variants stayed under 40% (39.1–39.4%); the other 15 were 41–47%.
+  - Criterion 4 for ETH: Sharpe 1.08 vs buy & hold's 1.15.
+  - Plateau: all four neighbours fail criteria 1–2.
+  - **R5, the decisive one:** Calmar 0.86 against a random-crowded 95th percentile of 1.18. H6 beat only **35%**
+    of 1,000 runs with the same number and lengths of crowded episodes placed at random (median 0.90).
+- **Passed:** criterion 3 (CAGR > 0), 4 for portfolio and BTC, 7 (23.4% without the best year), R1 (all four ±25%
+  variants kept Sharpe 1.10–1.22 vs a floor of 0.85), R2 (9 of 10 half-years positive; only 2022H1 lost, −35.2%),
+  R6 (Binance 37.3% CAGR), ≥ 3 episodes (BTC 8, ETH 8), not the corner.
+- Reported: R4 Monte Carlo 95th-percentile drawdown over 638 days at 1× costs, 42.9%. 3× costs 37.8% CAGR. Bitvavo
+  38.4% CAGR, −44.5% DD. Crowded days: BTC 251, ETH 289 of about 1,795 (14–16%).
+- **Checks on the result:**
+  - BTC and ETH CAGRs look identical in the report (38.3%) but are 38.34% and 38.25%: a coincidence of rounding.
+  - Prices match earlier runs (BTC €8,414 at the 2020-02-01 open, €90,106 at the 2024-12-31 close, as in #12).
+  - Portfolio exposure stayed between 12.8% and 59.9%, as the 50% base, x=0.5 and the 10-point band allow.
+- **What it means:**
+  - The higher Sharpe than buy & hold (1.20 vs 1.12) came from holding about half as much, not from the signal.
+    Random crowded periods at the same exposure did better 65% of the time.
+  - **Cutting exposure when funding was high didn't avoid the big fall.** The maximum drawdown ran from
+    2021-11-09 to 2022-06-19. In those 223 days H6 was crowded on only 13 days for BTC and 4 for ETH (median F about
+    6% a year), and on none in 2022H1. That's the weakness the card expected: a slow decline with low funding.
+  - x=0 (selling the whole half when crowded) had a lower Calmar than x=0.5 at every L and θ. Sitting out crowded
+    rallies cost more than the falls it avoided.
+  - This doesn't contradict the BIS paper's finding that high carry precedes crashes on average. It shows that
+    acting on it this way, at daily resolution with these costs, didn't beat chance on 2020–2024.
+- **Consequence (A3 step 3):** H6 is killed; it doesn't go to the holdout, which stays closed. A3 allows **one more
+  card (H7)**. If none is registered, or H7 fails too, A3's final stop applies.
+- Variants: 67 + 22 = **89**.
