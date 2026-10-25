@@ -53,7 +53,7 @@ All results at 2× costs (0.60% per side) on Kraken EUR daily data, for the vari
 
 - **Probably nothing to revoke:** the journal records no exchange API key, Telegram token or Healthchecks URL being
   created (#11, #13), and Azure for Students was never activated. If you made any of them yourself since, revoke it.
-- **The original working copy**, where the paper bot ran (probably `OneDrive\Работен плот\AiTradingBot`), still holds
+- **The original working copy**, where the paper bot ran, still holds
   the paper-trading database with its 2 paper positions, the logs, backups and any `config.private.json`. Check it
   for anything private, then delete it. Everything worth keeping is on GitHub.
 - **Optional cleanup in this copy** (gitignored): `data/` (51 MB of downloaded market data) and `.venv`.

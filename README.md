@@ -73,3 +73,12 @@ decision at the next candle's open; `tests/test_engine.py` checks it against a h
 - Never commit secrets. `gitleaks` runs on every commit; `config.private.json` and `.env` are gitignored.
 - API keys: trade + read only, **never withdrawal**, IP-whitelisted.
 - Pin Freqtrade: `requirements.txt` and the Docker image tag must match (enforced by a test).
+
+## License
+
+[GPL-3.0](LICENSE), the same license as [Freqtrade](https://github.com/freqtrade/freqtrade), which this project
+builds on. `user_data/strategies/sample_strategy.py`, `user_data/hyperopts/sample_hyperopt_loss.py` and
+`user_data/notebooks/strategy_analysis_example.ipynb` are Freqtrade's own templates, unmodified.
+
+Nothing here is financial advice. The strategies were tested and **rejected** (see the closing summary); don't trade
+them with real money.
