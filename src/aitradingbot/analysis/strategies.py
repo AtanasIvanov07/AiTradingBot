@@ -1,4 +1,4 @@
-"""Target-exposure rules for the registered hypotheses (research/hypotheses/H1.md – H3.md).
+"""Target-exposure rules for the registered hypotheses (research/hypotheses/H1.md – H6.md).
 
 Each function sees closes **up to and including** the decision candle only (rolling windows and
 shifts into the past). The engine executes the decision at the next candle's open. Tests perturb
@@ -80,4 +80,44 @@ def h3_vol_target(
     realised = realised * math.sqrt(periods_per_year)
     exposure: pd.Series = (target_vol / realised).clip(upper=1.0)
     exposure = exposure.replace([np.inf, -np.inf], 1.0).fillna(0.0)
+    return exposure
+
+
+DAYS_PER_YEAR = 365
+
+
+def daily_funding(settlements: pd.DataFrame) -> pd.Series:
+    """H6: funding paid per UTC day, the sum of that day's settlement rates.
+
+    A day is the daily candle opening at its 00:00 UTC, so a settlement at exactly 00:00 belongs to
+    the day it opens. The one at the candle's close (the next 00:00) belongs to the next day, as H6
+    registers. Days without settlements are NaN on a full calendar: no data, so no signal update.
+    """
+    times = settlements["funding_time"]
+    sums = settlements["rate"].groupby(times.dt.floor("D")).sum()
+    calendar = pd.date_range(sums.index.min(), sums.index.max(), freq="D", tz="UTC")
+    daily: pd.Series = sums.reindex(calendar)
+    return daily
+
+
+def h6_funding_signal(daily: pd.Series, lookback: int) -> pd.Series:
+    """H6's F: the mean of the last ``lookback`` daily funding sums, annualised (× 365)."""
+    signal: pd.Series = daily.rolling(lookback, min_periods=lookback).mean() * DAYS_PER_YEAR
+    return signal
+
+
+def h6_crowded(signal: pd.Series, theta: float, hysteresis: float) -> pd.Series:
+    """H6: crowded (1.0) when F ≥ θ, not (0.0) when F < θ − hysteresis, else unchanged.
+
+    A NaN signal (warm-up, or a day without settlements) changes nothing.
+    """
+    state = pd.Series(np.nan, index=signal.index)
+    state[signal >= theta] = 1.0
+    state[signal < theta - hysteresis] = 0.0
+    return state.ffill().fillna(0.0)
+
+
+def h6_exposure(crowded: pd.Series, base: float, multiplier: float) -> pd.Series:
+    """H6's target: ``base`` when not crowded, ``multiplier × base`` when crowded."""
+    exposure: pd.Series = base * (1 - (1 - multiplier) * crowded)
     return exposure
